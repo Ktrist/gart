@@ -7,6 +7,9 @@
 
 import { supabase } from './supabase';
 import { Product } from './api';
+import { DeliveryAddress } from './deliveryService';
+
+export type DeliveryType = 'pickup' | 'chronofresh';
 
 export interface SupabaseProduct {
   id: string;
@@ -71,6 +74,7 @@ export const supabaseApiService = {
         stock,
         stock_unit,
         is_available,
+        weight_grams,
         categories (
           name,
           slug
@@ -96,6 +100,7 @@ export const supabaseApiService = {
       stock_unit: product.stock_unit,
       available: product.is_available,
       category: product.categories?.name || undefined,
+      weight_grams: product.weight_grams || 300, // Default 300g if not set
     }));
   },
 
@@ -255,12 +260,12 @@ export const supabaseApiService = {
 
   /**
    * Crée une nouvelle commande
-   * Note: Cette fonction sera complétée avec Stripe (Épic 4)
+   * Supports both pickup and Chronofresh delivery orders
    */
   async createOrder(orderData: {
     userId: string;
     total: number;
-    pickupLocationId: string;
+    pickupLocationId?: string | null;
     salesCycleId: string | null;
     items: Array<{
       productId: string;
@@ -269,21 +274,50 @@ export const supabaseApiService = {
       productName: string;
       productUnit: string;
     }>;
+    // Delivery fields for Chronofresh
+    deliveryType?: DeliveryType;
+    deliveryAddress?: DeliveryAddress | null;
+    shippingCost?: number;
+    totalWeightGrams?: number;
   }): Promise<{ orderId: string; orderNumber: string } | null> {
     // Générer le numéro de commande
     const orderNumber = `GART-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
 
+    // Determine delivery type
+    const deliveryType = orderData.deliveryType || 'pickup';
+
+    // Prepare order data
+    const orderInsert: Record<string, unknown> = {
+      user_id: orderData.userId,
+      order_number: orderNumber,
+      total: orderData.total,
+      status: 'pending',
+      sales_cycle_id: orderData.salesCycleId,
+      delivery_type: deliveryType,
+    };
+
+    // Add pickup location for pickup orders
+    if (deliveryType === 'pickup' && orderData.pickupLocationId) {
+      orderInsert.pickup_location_id = orderData.pickupLocationId;
+    }
+
+    // Add delivery fields for Chronofresh orders
+    if (deliveryType === 'chronofresh') {
+      if (orderData.deliveryAddress) {
+        orderInsert.delivery_address = orderData.deliveryAddress;
+      }
+      if (orderData.shippingCost !== undefined) {
+        orderInsert.shipping_cost = orderData.shippingCost;
+      }
+      if (orderData.totalWeightGrams !== undefined) {
+        orderInsert.total_weight_grams = orderData.totalWeightGrams;
+      }
+    }
+
     // Créer la commande
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .insert({
-        user_id: orderData.userId,
-        order_number: orderNumber,
-        total: orderData.total,
-        status: 'pending',
-        pickup_location_id: orderData.pickupLocationId,
-        sales_cycle_id: orderData.salesCycleId,
-      })
+      .insert(orderInsert)
       .select()
       .single();
 

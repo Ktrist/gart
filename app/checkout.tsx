@@ -39,14 +39,23 @@ export default function CheckoutScreen() {
   const {
     cart,
     getCartTotal,
+    getTotalWithShipping,
+    getCartWeight,
     selectedPickupLocation,
     clearCart,
+    // Delivery state
+    deliveryType,
+    deliveryAddress,
+    shippingRate,
   } = useShopStore();
 
   const [loading, setLoading] = useState(false);
   const [paymentReady, setPaymentReady] = useState(false);
 
-  const total = getCartTotal();
+  const subtotal = getCartTotal();
+  const total = getTotalWithShipping();
+  const shippingCost = shippingRate?.price || 0;
+  const totalWeight = getCartWeight();
 
   useEffect(() => {
     initializePaymentSheet();
@@ -85,7 +94,7 @@ export default function CheckoutScreen() {
       const { clientSecret, paymentIntentId } =
         await stripeService.createPaymentIntent({
           amount: total,
-          description: `Commande Gart - ${cart.length} article(s)`,
+          description: `Commande Gart - ${cart.length} article(s)${deliveryType === 'chronofresh' ? ' (Livraison Chronofresh)' : ''}`,
           metadata: {
             cart_items: JSON.stringify(
               cart.map((item) => ({
@@ -94,6 +103,8 @@ export default function CheckoutScreen() {
               }))
             ),
             pickup_location_id: selectedPickupLocation?.id || '',
+            delivery_type: deliveryType,
+            shipping_cost: shippingCost.toString(),
           },
         });
 
@@ -196,9 +207,14 @@ export default function CheckoutScreen() {
       const result = await supabaseApiService.createOrder({
         userId: user.id,
         total: total,
-        pickupLocationId: selectedPickupLocation?.id || '',
+        pickupLocationId: deliveryType === 'pickup' ? selectedPickupLocation?.id : null,
         salesCycleId: currentCycle?.id || null,
         items: orderItems,
+        // Delivery fields
+        deliveryType,
+        deliveryAddress: deliveryType === 'chronofresh' ? deliveryAddress : null,
+        shippingCost: deliveryType === 'chronofresh' ? shippingCost : 0,
+        totalWeightGrams: deliveryType === 'chronofresh' ? totalWeight : undefined,
       });
 
       if (!result) {
@@ -222,6 +238,12 @@ export default function CheckoutScreen() {
           orderNumber: result.orderNumber,
           total: total.toFixed(2),
           pickupLocation: selectedPickupLocation?.name || '',
+          deliveryType,
+          deliveryCity: deliveryAddress?.city || '',
+          shippingCost: shippingCost.toFixed(2),
+          estimatedDays: shippingRate
+            ? `${shippingRate.estimatedDaysMin}-${shippingRate.estimatedDaysMax}`
+            : '',
         },
       });
     } catch (error) {
@@ -275,11 +297,31 @@ export default function CheckoutScreen() {
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Point de retrait</Text>
-            <Text style={styles.summaryValue}>
-              {selectedPickupLocation?.name || 'Non défini'}
-            </Text>
+            <Text style={styles.summaryLabel}>Sous-total</Text>
+            <Text style={styles.summaryValue}>{subtotal.toFixed(2)} €</Text>
           </View>
+
+          {deliveryType === 'pickup' ? (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Point de retrait</Text>
+              <Text style={styles.summaryValue}>
+                {selectedPickupLocation?.name || 'Non défini'}
+              </Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Livraison Chronofresh</Text>
+                <Text style={styles.summaryValue}>{shippingCost.toFixed(2)} €</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Livraison à</Text>
+                <Text style={styles.summaryValue}>
+                  {deliveryAddress?.city || 'Non défini'}
+                </Text>
+              </View>
+            </>
+          )}
 
           <View style={[styles.summaryRow, styles.totalRow]}>
             <Text style={styles.totalLabel}>Total</Text>

@@ -7,9 +7,10 @@ import {
   Alert,
   StyleSheet,
   Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useShopStore } from '../../store/shopStore';
+import { useShopStore, DeliveryType } from '../../store/shopStore';
 import { supabasePickupService, PickupLocation } from '../../services/supabasePickupService';
 
 const COLORS = {
@@ -220,8 +221,19 @@ export default function CartScreen() {
     selectedPickupLocation,
     setPickupLocation,
     canCheckout,
+    // Delivery state
+    deliveryType,
+    deliveryAddress,
+    shippingRate,
+    shippingLoading,
+    shippingError,
+    setDeliveryType,
+    getTotalWithShipping,
+    getCartWeight,
   } = useShopStore();
   const total = getCartTotal();
+  const totalWithShipping = getTotalWithShipping();
+  const cartWeight = getCartWeight();
   const [showPickupModal, setShowPickupModal] = useState(false);
 
   if (cart.length === 0) {
@@ -279,52 +291,182 @@ export default function CartScreen() {
           <CartItem key={item.product.id} item={item} />
         ))}
 
-        {/* Pickup Location Selection - US-3.2 */}
+        {/* Delivery Method Selection */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>📍 Point de retrait</Text>
+          <Text style={styles.sectionTitle}>🚚 Mode de livraison</Text>
 
-          {selectedPickupLocation ? (
-            <View style={styles.selectedLocationCard}>
-              <View style={styles.selectedLocationHeader}>
-                <Text style={styles.selectedLocationIcon}>
-                  {selectedPickupLocation.icon}
+          <View style={styles.deliveryToggle}>
+            <TouchableOpacity
+              style={[
+                styles.deliveryOption,
+                deliveryType === 'pickup' && styles.deliveryOptionActive,
+              ]}
+              onPress={() => setDeliveryType('pickup')}
+            >
+              <Text style={styles.deliveryOptionIcon}>📍</Text>
+              <View style={styles.deliveryOptionInfo}>
+                <Text
+                  style={[
+                    styles.deliveryOptionTitle,
+                    deliveryType === 'pickup' && styles.deliveryOptionTitleActive,
+                  ]}
+                >
+                  Retrait
                 </Text>
-                <View style={styles.selectedLocationInfo}>
-                  <Text style={styles.selectedLocationName}>
-                    {selectedPickupLocation.name}
-                  </Text>
-                  <Text style={styles.selectedLocationType}>
-                    {selectedPickupLocation.type === 'farm'
-                      ? 'À la ferme'
-                      : 'Dépôt'}
-                  </Text>
-                </View>
+                <Text style={styles.deliveryOptionSubtitle}>Gratuit</Text>
               </View>
+              {deliveryType === 'pickup' && (
+                <Text style={styles.deliveryOptionCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
 
-              <Text style={styles.selectedLocationAddress}>
-                📍 {selectedPickupLocation.address}, {selectedPickupLocation.postalCode} {selectedPickupLocation.city}
-              </Text>
+            <TouchableOpacity
+              style={[
+                styles.deliveryOption,
+                deliveryType === 'chronofresh' && styles.deliveryOptionActive,
+              ]}
+              onPress={() => setDeliveryType('chronofresh')}
+            >
+              <Text style={styles.deliveryOptionIcon}>❄️</Text>
+              <View style={styles.deliveryOptionInfo}>
+                <Text
+                  style={[
+                    styles.deliveryOptionTitle,
+                    deliveryType === 'chronofresh' && styles.deliveryOptionTitleActive,
+                  ]}
+                >
+                  Chronofresh
+                </Text>
+                <Text style={styles.deliveryOptionSubtitle}>
+                  {shippingRate ? `${shippingRate.price.toFixed(2)} €` : 'À calculer'}
+                </Text>
+              </View>
+              {deliveryType === 'chronofresh' && (
+                <Text style={styles.deliveryOptionCheck}>✓</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
 
+        {/* Pickup Location Selection - US-3.2 */}
+        {deliveryType === 'pickup' && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>📍 Point de retrait</Text>
+
+            {selectedPickupLocation ? (
+              <View style={styles.selectedLocationCard}>
+                <View style={styles.selectedLocationHeader}>
+                  <Text style={styles.selectedLocationIcon}>
+                    {selectedPickupLocation.icon}
+                  </Text>
+                  <View style={styles.selectedLocationInfo}>
+                    <Text style={styles.selectedLocationName}>
+                      {selectedPickupLocation.name}
+                    </Text>
+                    <Text style={styles.selectedLocationType}>
+                      {selectedPickupLocation.type === 'farm'
+                        ? 'À la ferme'
+                        : 'Dépôt'}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.selectedLocationAddress}>
+                  📍 {selectedPickupLocation.address}, {selectedPickupLocation.postalCode} {selectedPickupLocation.city}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.changeLocationButton}
+                  onPress={() => setShowPickupModal(true)}
+                >
+                  <Text style={styles.changeLocationButtonText}>
+                    Changer de point de retrait
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
               <TouchableOpacity
-                style={styles.changeLocationButton}
+                style={styles.selectLocationButton}
                 onPress={() => setShowPickupModal(true)}
               >
-                <Text style={styles.changeLocationButtonText}>
-                  Changer de point de retrait
+                <Text style={styles.selectLocationButtonText}>
+                  ➕ Choisir un point de retrait
                 </Text>
               </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.selectLocationButton}
-              onPress={() => setShowPickupModal(true)}
-            >
-              <Text style={styles.selectLocationButtonText}>
-                ➕ Choisir un point de retrait
+            )}
+          </View>
+        )}
+
+        {/* Delivery Address Section - Chronofresh */}
+        {deliveryType === 'chronofresh' && (
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>📍 Adresse de livraison</Text>
+
+            {deliveryAddress ? (
+              <View style={styles.selectedLocationCard}>
+                <View style={styles.deliveryAddressContent}>
+                  <Text style={styles.deliveryAddressName}>{deliveryAddress.name}</Text>
+                  <Text style={styles.deliveryAddressText}>{deliveryAddress.street}</Text>
+                  <Text style={styles.deliveryAddressText}>
+                    {deliveryAddress.postalCode} {deliveryAddress.city}
+                  </Text>
+                  <Text style={styles.deliveryAddressPhone}>📞 {deliveryAddress.phone}</Text>
+                  {deliveryAddress.instructions && (
+                    <Text style={styles.deliveryAddressInstructions}>
+                      💬 {deliveryAddress.instructions}
+                    </Text>
+                  )}
+                </View>
+
+                {shippingLoading ? (
+                  <View style={styles.shippingLoadingContainer}>
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                    <Text style={styles.shippingLoadingText}>Calcul des frais...</Text>
+                  </View>
+                ) : shippingError ? (
+                  <View style={styles.shippingErrorContainer}>
+                    <Text style={styles.shippingErrorText}>❌ {shippingError}</Text>
+                  </View>
+                ) : shippingRate && (
+                  <View style={styles.shippingRateContainer}>
+                    <View style={styles.shippingRateRow}>
+                      <Text style={styles.shippingRateLabel}>Zone: {shippingRate.zone}</Text>
+                      <Text style={styles.shippingRateValue}>{shippingRate.price.toFixed(2)} €</Text>
+                    </View>
+                    <Text style={styles.shippingRateDelivery}>
+                      🚚 Livraison en {shippingRate.estimatedDaysMin}-{shippingRate.estimatedDaysMax} jours ouvrés
+                    </Text>
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={styles.changeLocationButton}
+                  onPress={() => router.push('/delivery-address')}
+                >
+                  <Text style={styles.changeLocationButtonText}>
+                    Modifier l'adresse
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.selectLocationButton}
+                onPress={() => router.push('/delivery-address')}
+              >
+                <Text style={styles.selectLocationButtonText}>
+                  ➕ Entrer une adresse de livraison
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Cold Chain Info */}
+            <View style={styles.coldChainInfo}>
+              <Text style={styles.coldChainInfoText}>
+                ❄️ Livraison en chaîne du froid garantie
               </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            </View>
+          </View>
+        )}
 
         {/* Order Summary - US-3.1 */}
         <View style={styles.sectionContainer}>
@@ -332,18 +474,26 @@ export default function CartScreen() {
 
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Sous-total</Text>
+              <Text style={styles.summaryLabel}>Sous-total produits</Text>
               <Text style={styles.summaryValue}>{total.toFixed(2)} €</Text>
             </View>
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Frais de service</Text>
-              <Text style={styles.summaryValue}>0.00 €</Text>
+              <Text style={styles.summaryLabel}>
+                {deliveryType === 'pickup' ? 'Retrait (gratuit)' : 'Livraison Chronofresh'}
+              </Text>
+              <Text style={styles.summaryValue}>
+                {deliveryType === 'pickup'
+                  ? '0.00 €'
+                  : shippingRate
+                    ? `${shippingRate.price.toFixed(2)} €`
+                    : '-'}
+              </Text>
             </View>
 
             <View style={[styles.summaryRow, styles.summaryRowTotal]}>
               <Text style={styles.summaryLabelTotal}>Total</Text>
-              <Text style={styles.summaryValueTotal}>{total.toFixed(2)} €</Text>
+              <Text style={styles.summaryValueTotal}>{totalWithShipping.toFixed(2)} €</Text>
             </View>
           </View>
         </View>
@@ -374,7 +524,7 @@ export default function CartScreen() {
       <View style={styles.footer}>
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total:</Text>
-          <Text style={styles.totalAmount}>{total.toFixed(2)} €</Text>
+          <Text style={styles.totalAmount}>{totalWithShipping.toFixed(2)} €</Text>
         </View>
 
         <TouchableOpacity
@@ -385,9 +535,11 @@ export default function CartScreen() {
           onPress={handleCheckout}
         >
           <Text style={styles.checkoutButtonText}>
-            {selectedPickupLocation
+            {canCheckout().valid
               ? '✅ Valider la commande'
-              : '⚠️ Choisir un point de retrait'}
+              : deliveryType === 'pickup'
+                ? '⚠️ Choisir un point de retrait'
+                : '⚠️ Entrer une adresse de livraison'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -807,5 +959,135 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: COLORS.primary,
+  },
+  // Delivery Method Toggle
+  deliveryToggle: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  deliveryOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: COLORS.beigeDark,
+  },
+  deliveryOptionActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#E8F5E9',
+  },
+  deliveryOptionIcon: {
+    fontSize: 24,
+    marginRight: 12,
+  },
+  deliveryOptionInfo: {
+    flex: 1,
+  },
+  deliveryOptionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  deliveryOptionTitleActive: {
+    color: COLORS.primary,
+  },
+  deliveryOptionSubtitle: {
+    fontSize: 14,
+    color: COLORS.gray,
+    marginTop: 2,
+  },
+  deliveryOptionCheck: {
+    fontSize: 18,
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  // Delivery Address
+  deliveryAddressContent: {
+    marginBottom: 12,
+  },
+  deliveryAddressName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginBottom: 4,
+  },
+  deliveryAddressText: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 2,
+  },
+  deliveryAddressPhone: {
+    fontSize: 14,
+    color: COLORS.gray,
+    marginTop: 4,
+  },
+  deliveryAddressInstructions: {
+    fontSize: 13,
+    color: COLORS.gray,
+    fontStyle: 'italic',
+    marginTop: 4,
+  },
+  // Shipping Rate Display
+  shippingLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: COLORS.beige,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  shippingLoadingText: {
+    marginLeft: 8,
+    color: COLORS.gray,
+  },
+  shippingErrorContainer: {
+    padding: 12,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  shippingErrorText: {
+    color: COLORS.red,
+    textAlign: 'center',
+  },
+  shippingRateContainer: {
+    padding: 12,
+    backgroundColor: '#E8F5E9',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  shippingRateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  shippingRateLabel: {
+    fontSize: 14,
+    color: COLORS.primaryDark,
+  },
+  shippingRateValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  shippingRateDelivery: {
+    fontSize: 13,
+    color: COLORS.primaryDark,
+    marginTop: 4,
+  },
+  coldChainInfo: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#EBF8FF',
+    borderRadius: 8,
+  },
+  coldChainInfoText: {
+    fontSize: 14,
+    color: '#1E40AF',
+    textAlign: 'center',
   },
 });
