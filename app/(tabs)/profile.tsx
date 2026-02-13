@@ -39,6 +39,7 @@ import {
   User,
   Info,
   Leaf,
+  Bell,
 } from 'lucide-react-native';
 import { useAuth } from '../../contexts/AuthContext';
 import { useFavoritesStore } from '../../store/favoritesStore';
@@ -557,6 +558,38 @@ export default function ProfileScreen() {
                 {favoritesCount > 0
                   ? `${favoritesCount} produit${favoritesCount > 1 ? 's' : ''} sauvegardé${favoritesCount > 1 ? 's' : ''}`
                   : 'Aucun favori pour le moment'}
+              </Text>
+            </View>
+            <ChevronRight
+              size={ICON_SIZE_LG}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.leaf}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Notifications Button */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.ordersButton}
+            onPress={() => router.push('/notification-settings')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.ordersButtonIcon}>
+              <Bell
+                size={ICON_SIZE_LG}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.leaf}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            </View>
+            <View style={styles.ordersButtonContent}>
+              <Text style={styles.ordersButtonTitle}>Notifications</Text>
+              <Text style={styles.ordersButtonSubtitle}>
+                G\u00E9rez vos alertes et pr\u00E9f\u00E9rences
               </Text>
             </View>
             <ChevronRight
