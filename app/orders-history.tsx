@@ -30,6 +30,7 @@ import {
   RefreshCw,
   ShoppingBag,
   AlertCircle,
+  FileText,
 } from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { useShopStore } from '../store/shopStore';
@@ -37,6 +38,7 @@ import { supabase } from '../services/supabase';
 import { LoadingScreen, EmptyState } from '../components';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 import { haptics } from '../utils/haptics';
+import { invoiceService, InvoiceOrder } from '../services/invoiceService';
 
 // Aerial field image for hero
 const AERIAL_FIELD_IMAGE = {
@@ -196,6 +198,31 @@ export default function OrdersHistoryScreen() {
     } else if (unavailableItems.length > 0) {
       haptics.warning();
     }
+  };
+
+  /**
+   * Télécharger la facture PDF
+   */
+  const handleDownloadInvoice = async (order: Order) => {
+    haptics.light();
+    const invoiceOrder: InvoiceOrder = {
+      id: order.id,
+      orderNumber: order.order_number,
+      createdAt: order.created_at,
+      total: order.total,
+      status: order.status,
+      pickupLocationName: order.pickup_location?.name,
+      items: order.order_items.map((item) => ({
+        productName: item.product_name,
+        quantity: item.quantity,
+        unitPrice: item.unit_price,
+        totalPrice: item.unit_price * item.quantity,
+        productUnit: item.product_unit,
+      })),
+      userName: user?.user_metadata?.full_name || user?.email?.split('@')[0],
+      userEmail: user?.email,
+    };
+    await invoiceService.generateAndShare(invoiceOrder);
   };
 
   /**
@@ -460,27 +487,46 @@ export default function OrdersHistoryScreen() {
                 </View>
               )}
 
-              {/* Reorder Button */}
-              <TouchableOpacity
-                style={[
-                  styles.reorderButton,
-                  reorderingId === order.id && styles.reorderButtonLoading,
-                ]}
-                onPress={() => handleReorder(order)}
-                disabled={reorderingId !== null}
-                activeOpacity={0.8}
-              >
-                <RefreshCw
-                  size={16}
-                  strokeWidth={STROKE_WIDTH}
-                  color={COLORS.offWhite}
-                  strokeLinejoin="round"
-                  strokeLinecap="round"
-                />
-                <Text style={styles.reorderButtonText}>
-                  {reorderingId === order.id ? 'Ajout en cours...' : 'Re-commander'}
-                </Text>
-              </TouchableOpacity>
+              {/* Action Buttons */}
+              <View style={styles.actionButtons}>
+                {/* Invoice Button */}
+                <TouchableOpacity
+                  style={styles.invoiceButton}
+                  onPress={() => handleDownloadInvoice(order)}
+                  activeOpacity={0.8}
+                >
+                  <FileText
+                    size={16}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.darkGreen}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  <Text style={styles.invoiceButtonText}>Facture</Text>
+                </TouchableOpacity>
+
+                {/* Reorder Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.reorderButton,
+                    reorderingId === order.id && styles.reorderButtonLoading,
+                  ]}
+                  onPress={() => handleReorder(order)}
+                  disabled={reorderingId !== null}
+                  activeOpacity={0.8}
+                >
+                  <RefreshCw
+                    size={16}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.offWhite}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  <Text style={styles.reorderButtonText}>
+                    {reorderingId === order.id ? 'Ajout en cours...' : 'Re-commander'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         ))}
@@ -638,8 +684,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.leaf,
   },
+  // Action Buttons
+  actionButtons: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    marginTop: SPACING.lg,
+  },
+  invoiceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.offWhite,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+  },
+  invoiceButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+  },
   // Reorder Button
   reorderButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -647,7 +717,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.darkGreen,
     paddingVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
-    marginTop: SPACING.lg,
     ...SHADOWS.sm,
   },
   reorderButtonLoading: {

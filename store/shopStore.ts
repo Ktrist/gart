@@ -4,6 +4,7 @@ import { supabaseApiService } from '../services/supabaseApi';
 import { supabaseSalesCycleService, SalesCycleStatus } from '../services/supabaseSalesCycleService';
 import { PickupLocation } from '../services/supabasePickupService';
 import { DeliveryAddress, ShippingRate, calculateShippingRate } from '../services/deliveryService';
+import { cartPersistenceService, PersistedCart, PersistedCartItem } from '../services/cartPersistenceService';
 
 export type DeliveryType = 'pickup' | 'chronofresh';
 
@@ -57,6 +58,11 @@ interface ShopStore {
   getCartWeight: () => number;
   getTotalWithShipping: () => number;
 
+  // Persistence
+  loadPersistedCart: () => Promise<void>;
+  persistCart: () => void;
+  clearPersistedCart: () => Promise<void>;
+
   // Validation
   canCheckout: () => { valid: boolean; errors: string[] };
 }
@@ -84,6 +90,10 @@ export const useShopStore = create<ShopStore>((set, get) => ({
     try {
       const products = await supabaseApiService.fetchProducts();
       set({ products, isLoading: false });
+      // Restore persisted cart after products are loaded
+      if (get().cart.length === 0) {
+        get().loadPersistedCart();
+      }
     } catch (error) {
       console.error('Error fetching products from Supabase:', error);
       set({
@@ -145,11 +155,13 @@ export const useShopStore = create<ShopStore>((set, get) => ({
       set({ cart: [...cart, { product, quantity }] });
     }
 
+    get().persistCart();
     return true; // Retourner true pour indiquer le succès
   },
 
   removeFromCart: (productId) => {
     set({ cart: get().cart.filter((item) => item.product.id !== productId) });
+    get().persistCart();
   },
 
   updateCartQuantity: (productId, quantity) => {
@@ -163,6 +175,7 @@ export const useShopStore = create<ShopStore>((set, get) => ({
         item.product.id === productId ? { ...item, quantity } : item
       ),
     });
+    get().persistCart();
   },
 
   clearCart: () => {
@@ -174,6 +187,7 @@ export const useShopStore = create<ShopStore>((set, get) => ({
       shippingRate: null,
       shippingError: null,
     });
+    cartPersistenceService.clearAll().catch(() => {});
   },
 
   // Pickup Location Actions - US-3.2
@@ -298,6 +312,65 @@ export const useShopStore = create<ShopStore>((set, get) => ({
     }
 
     return cartTotal;
+  },
+
+  // Cart Persistence
+  loadPersistedCart: async () => {
+    try {
+      const persisted = await cartPersistenceService.load();
+      if (persisted.items.length === 0) return;
+
+      const { products } = get();
+
+      // Rebuild cart items from persisted data by matching with current products
+      const restoredItems: CartItem[] = [];
+      for (const item of persisted.items) {
+        const product = products.find(
+          (p) => p.uuid === item.productId || p.id === item.numericId
+        );
+        if (product && product.available && product.stock > 0) {
+          const qty = Math.min(item.quantity, product.stock);
+          if (qty > 0) {
+            restoredItems.push({ product, quantity: qty });
+          }
+        }
+      }
+
+      if (restoredItems.length > 0) {
+        set({
+          cart: restoredItems,
+          deliveryType: persisted.deliveryType || 'pickup',
+        });
+      }
+    } catch (error) {
+      console.error('Error loading persisted cart:', error);
+    }
+  },
+
+  persistCart: () => {
+    const { cart, deliveryType, selectedPickupLocation, deliveryAddress } = get();
+
+    const persisted: PersistedCart = {
+      items: cart.map((item): PersistedCartItem => ({
+        productId: item.product.uuid || item.product.id.toString(),
+        numericId: item.product.id,
+        quantity: item.quantity,
+        unitPrice: item.product.price,
+        name: item.product.name,
+        unit: item.product.unit,
+      })),
+      deliveryType,
+      pickupLocationId: selectedPickupLocation?.id,
+      deliveryAddress: deliveryAddress as Record<string, unknown> | undefined,
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Fire and forget — don't block the UI
+    cartPersistenceService.save(persisted).catch(() => {});
+  },
+
+  clearPersistedCart: async () => {
+    await cartPersistenceService.clearAll();
   },
 
   // Validation avant checkout
