@@ -8,15 +8,22 @@
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
+import {
+  CheckCircle,
+  ClipboardList,
+  Snowflake,
+  Check,
+  Target,
+  MessageCircle,
+  Mail,
+  Phone,
+  Package,
+  Home,
+} from 'lucide-react-native';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 
-const COLORS = {
-  primary: '#2E7D32',
-  primaryDark: '#1B5E20',
-  beige: '#F5F5DC',
-  white: '#FFFFFF',
-  green: '#10B981',
-  gray: '#6B7280',
-};
+const ICON_SIZE = 20;
+const STROKE_WIDTH = 1.5;
 
 export default function OrderConfirmationScreen() {
   const router = useRouter();
@@ -42,7 +49,15 @@ export default function OrderConfirmationScreen() {
       <View style={styles.content}>
         {/* Icône de succès */}
         <View style={styles.successIcon}>
-          <Text style={styles.successEmoji}>✅</Text>
+          <View style={styles.successIconContainer}>
+            <CheckCircle
+              size={64}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.leaf}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          </View>
         </View>
 
         {/* Titre de confirmation */}
@@ -59,7 +74,16 @@ export default function OrderConfirmationScreen() {
 
         {/* Récapitulatif */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>📋 Récapitulatif</Text>
+          <View style={styles.sectionTitleRow}>
+            <ClipboardList
+              size={ICON_SIZE}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.sage}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.summaryTitle}>Récapitulatif</Text>
+          </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Montant payé</Text>
@@ -70,7 +94,16 @@ export default function OrderConfirmationScreen() {
             <>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Mode de livraison</Text>
-                <Text style={styles.summaryValue}>❄️ Chronofresh</Text>
+                <View style={styles.deliveryModeValue}>
+                  <Snowflake
+                    size={16}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.darkGreen}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  <Text style={styles.summaryValue}>Chronofresh</Text>
+                </View>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Livraison à</Text>
@@ -99,14 +132,30 @@ export default function OrderConfirmationScreen() {
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Statut</Text>
             <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>✓ Confirmé</Text>
+              <Check
+                size={14}
+                strokeWidth={2}
+                color={COLORS.leaf}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <Text style={styles.statusText}>Confirmé</Text>
             </View>
           </View>
         </View>
 
         {/* Prochaines étapes */}
         <View style={styles.nextStepsCard}>
-          <Text style={styles.nextStepsTitle}>🎯 Prochaines étapes</Text>
+          <View style={styles.sectionTitleRow}>
+            <Target
+              size={ICON_SIZE}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.sage}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.nextStepsTitle}>Prochaines étapes</Text>
+          </View>
 
           <View style={styles.stepRow}>
             <Text style={styles.stepNumber}>1</Text>
@@ -182,13 +231,40 @@ export default function OrderConfirmationScreen() {
 
         {/* Informations de contact */}
         <View style={styles.contactCard}>
-          <Text style={styles.contactTitle}>💬 Besoin d'aide ?</Text>
+          <View style={styles.contactTitleRow}>
+            <MessageCircle
+              size={ICON_SIZE}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.darkGreen}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.contactTitle}>Besoin d'aide ?</Text>
+          </View>
           <Text style={styles.contactText}>
             Si vous avez des questions sur votre commande, n'hésitez pas à nous
             contacter :
           </Text>
-          <Text style={styles.contactInfo}>📧 contact@gart-batilly.fr</Text>
-          <Text style={styles.contactInfo}>📱 06 XX XX XX XX</Text>
+          <View style={styles.contactInfoRow}>
+            <Mail
+              size={16}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.leaf}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.contactInfo}>contact@gart-batilly.fr</Text>
+          </View>
+          <View style={styles.contactInfoRow}>
+            <Phone
+              size={16}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.leaf}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.contactInfo}>06 XX XX XX XX</Text>
+          </View>
         </View>
 
         {/* Boutons d'action */}
@@ -199,9 +275,16 @@ export default function OrderConfirmationScreen() {
             router.replace('/(tabs)/profile');
           }}
         >
-          <Text style={styles.primaryButtonText}>
-            📦 Voir mes commandes
-          </Text>
+          <View style={styles.buttonContent}>
+            <Package
+              size={18}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.offWhite}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.primaryButtonText}>Voir mes commandes</Text>
+          </View>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -211,9 +294,16 @@ export default function OrderConfirmationScreen() {
             router.replace('/(tabs)');
           }}
         >
-          <Text style={styles.secondaryButtonText}>
-            🏠 Retour à l'accueil
-          </Text>
+          <View style={styles.buttonContent}>
+            <Home
+              size={18}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.darkGreen}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.secondaryButtonText}>Retour à l'accueil</Text>
+          </View>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -223,125 +313,158 @@ export default function OrderConfirmationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.beige,
+    backgroundColor: COLORS.offWhite,
   },
   content: {
-    padding: 20,
-    paddingTop: 60,
+    padding: SPACING.lg,
+    paddingTop: SPACING.xxl + SPACING.lg,
   },
   successIcon: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: SPACING.lg,
   },
-  successEmoji: {
-    fontSize: 80,
+  successIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   title: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   subtitle: {
     fontSize: 16,
-    color: COLORS.gray,
+    color: COLORS.sage,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: SPACING.xl,
   },
   orderNumberCard: {
-    backgroundColor: COLORS.green,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
+    backgroundColor: COLORS.leaf,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
     alignItems: 'center',
+    ...SHADOWS.lg,
   },
   orderNumberLabel: {
-    fontSize: 14,
-    color: COLORS.white,
-    marginBottom: 8,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.offWhite,
+    marginBottom: SPACING.sm,
     opacity: 0.9,
+    textTransform: 'uppercase',
   },
   orderNumber: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.white,
+    fontWeight: '700',
+    color: COLORS.offWhite,
     letterSpacing: 1,
   },
   summaryCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+    ...SHADOWS.sm,
   },
   summaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 16,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.sage,
+    marginBottom: SPACING.md,
+    textTransform: 'uppercase',
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   summaryLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.gray,
   },
   summaryValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.darkGreen,
+  },
+  deliveryModeValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
   },
   statusBadge: {
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    backgroundColor: COLORS.offWhite,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    borderColor: COLORS.leaf,
   },
   statusText: {
-    color: COLORS.green,
-    fontWeight: '600',
-    fontSize: 14,
+    color: COLORS.leaf,
+    fontWeight: '700',
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   nextStepsCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+    ...SHADOWS.sm,
   },
   nextStepsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 20,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.sage,
+    marginBottom: SPACING.lg,
+    textTransform: 'uppercase',
   },
   stepRow: {
     flexDirection: 'row',
-    marginBottom: 20,
+    marginBottom: SPACING.lg,
   },
   stepNumber: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: COLORS.primary,
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: 'bold',
+    backgroundColor: COLORS.darkGreen,
+    color: COLORS.offWhite,
+    fontSize: 14,
+    fontWeight: '700',
     textAlign: 'center',
     lineHeight: 32,
-    marginRight: 12,
+    marginRight: SPACING.md,
+    overflow: 'hidden',
   },
   stepContent: {
     flex: 1,
   },
   stepTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.xs,
   },
   stepDescription: {
     fontSize: 14,
@@ -349,57 +472,72 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   contactCard: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+  },
+  contactTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   contactTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#92400E',
-    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+  },
+  contactInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   contactText: {
     fontSize: 14,
-    color: '#92400E',
-    marginBottom: 12,
+    color: COLORS.gray,
+    marginBottom: SPACING.md,
     lineHeight: 20,
   },
   contactInfo: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#92400E',
-    marginBottom: 4,
+    color: COLORS.leaf,
   },
   primaryButton: {
-    backgroundColor: COLORS.primary,
-    padding: 18,
-    borderRadius: 12,
+    backgroundColor: COLORS.darkGreen,
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
     alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    marginBottom: SPACING.md,
+    ...SHADOWS.lg,
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
   primaryButtonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: COLORS.offWhite,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   secondaryButton: {
     backgroundColor: COLORS.white,
-    padding: 18,
-    borderRadius: 12,
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
   },
   secondaryButtonText: {
-    color: COLORS.primary,
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: COLORS.darkGreen,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
 });

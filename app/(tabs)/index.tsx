@@ -1,220 +1,482 @@
+/**
+ * Home Screen
+ *
+ * Écran d'accueil avec design premium Gart
+ * Affiche le statut de la boutique et les engagements
+ */
+
 import { useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  ImageBackground,
+  useWindowDimensions,
+  StyleSheet,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import {
+  MapPin,
+  Leaf,
+  CalendarDays,
+  ShoppingBag,
+  Clock,
+  ArrowRight,
+  Info,
+} from 'lucide-react-native';
 import { useShopStore } from '../../store/shopStore';
 import { supabaseSalesCycleService } from '../../services/supabaseSalesCycleService';
+import { LoadingScreen } from '../../components';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../constants/theme';
 
-const COLORS = {
-  primary: '#2E7D32',
-  primaryDark: '#1B5E20',
-  beige: '#F5F5DC',
-  beigeDark: '#E8E8CD',
-  white: '#FFFFFF',
-  red: '#DC2626',
+const ICON_SIZE = 24;
+const ICON_SIZE_SM = 20;
+const STROKE_WIDTH = 1.5;
+
+// Aerial field image for banner
+const AERIAL_FIELD_IMAGE = {
+  uri: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&q=80',
 };
 
 export default function HomeScreen() {
   const router = useRouter();
   const { shopStatus, isLoading, fetchShopStatus } = useShopStore();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const bannerHeight = height * 0.38;
+  const contentWidth = width * 0.9;
+  // Minimum 20px padding below safe area for premium spacing
+  const heroTopPadding = insets.top + 20;
 
   useEffect(() => {
     fetchShopStatus();
   }, []);
 
   if (isLoading && !shopStatus) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Chargement...</Text>
-      </View>
-    );
+    return <LoadingScreen message="Chargement de la boutique..." />;
   }
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Sales Cycle Status Banner */}
-      <View
-        style={[
-          styles.banner,
-          { backgroundColor: shopStatus?.isOpen ? COLORS.primary : COLORS.red },
-        ]}
+    <View style={styles.container}>
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
       >
-        <Text style={styles.bannerTitle}>
-          {shopStatus?.isOpen ? '✅ VENTE OUVERTE' : '🔒 VENTE FERMÉE'}
-        </Text>
-        <Text style={styles.bannerText}>{shopStatus?.message}</Text>
-
-        {/* Informations supplémentaires sur le cycle */}
-        {shopStatus?.isOpen && shopStatus.currentCycle && (
-          <View style={styles.cycleInfo}>
-            <Text style={styles.cycleInfoText}>
-              📅 {shopStatus.currentCycle.name}
-            </Text>
-            <Text style={styles.cycleInfoText}>
-              Du {supabaseSalesCycleService.formatDateShort(shopStatus.currentCycle.openingDate)} au{' '}
-              {supabaseSalesCycleService.formatDateShort(shopStatus.currentCycle.closingDate)}
-            </Text>
-          </View>
-        )}
-
-        {/* Informations sur le prochain cycle si fermé */}
-        {!shopStatus?.isOpen && shopStatus?.nextCycle && (
-          <View style={styles.cycleInfo}>
-            <Text style={styles.cycleInfoText}>
-              ⏳ Dans {shopStatus.daysUntilNextOpening}{' '}
-              {shopStatus.daysUntilNextOpening === 1 ? 'jour' : 'jours'}
-            </Text>
-            <Text style={styles.cycleInfoText}>
-              📅 {shopStatus.nextCycle.name}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Welcome Section */}
-      <View style={styles.content}>
-        <Text style={styles.title}>🌱 Gart - Le jardin du bon</Text>
-        <Text style={styles.description}>
-          Bienvenue dans votre AMAP locale ! Découvrez nos légumes frais et de saison, cultivés avec passion et respect de l'environnement.
-        </Text>
-
-        {/* Info Cards */}
-        <View style={styles.cardsContainer}>
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>🚜 Produits locaux</Text>
-            <Text style={styles.cardText}>
-              Tous nos légumes sont cultivés à Batilly-en-puisaye, à moins de 5km de votre point de retrait.
-            </Text>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>🌿 Agriculture biologique</Text>
-            <Text style={styles.cardText}>
-              Sans pesticides ni produits chimiques, pour votre santé et celle de la planète.
-            </Text>
-          </View>
-
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>📅 Cycle de vente</Text>
-            <Text style={styles.cardText}>
-              Les ventes sont ouvertes une fois par semaine. Passez commande pendant la période d'ouverture.
-            </Text>
-          </View>
-        </View>
-
-        {/* CTA Button */}
-        {shopStatus?.isOpen && (
-          <TouchableOpacity
-            style={styles.ctaButton}
-            onPress={() => router.push('/shop')}
+        {/* Hero Banner with Aerial Field Background */}
+        <ImageBackground
+          source={AERIAL_FIELD_IMAGE}
+          style={[styles.heroBanner, { height: bannerHeight }]}
+          resizeMode="cover"
+        >
+          <LinearGradient
+            colors={[
+              'rgba(20, 50, 33, 0.1)',
+              shopStatus?.isOpen
+                ? 'rgba(45, 90, 60, 0.85)'
+                : 'rgba(118, 141, 93, 0.85)',
+              shopStatus?.isOpen
+                ? 'rgba(45, 90, 60, 0.95)'
+                : 'rgba(118, 141, 93, 0.95)',
+            ]}
+            locations={[0, 0.5, 1]}
+            style={styles.heroGradient}
           >
-            <Text style={styles.ctaButtonText}>🛒 Voir les produits disponibles</Text>
+            <View style={[styles.heroContent, { paddingTop: heroTopPadding }]}>
+              {/* Status Badge */}
+              <View style={styles.statusBadge}>
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: shopStatus?.isOpen ? '#4ADE80' : COLORS.borderCream },
+                  ]}
+                />
+                <Text style={styles.statusBadgeText}>
+                  {shopStatus?.isOpen ? 'BOUTIQUE OUVERTE' : 'BOUTIQUE FERMÉE'}
+                </Text>
+              </View>
+
+              {/* Main Title */}
+              <Text style={styles.heroTitle}>
+                {shopStatus?.isOpen ? 'Bienvenue !' : 'À bientôt !'}
+              </Text>
+              <Text style={styles.heroSubtitle}>{shopStatus?.message}</Text>
+
+              {/* Cycle Info */}
+              {shopStatus?.isOpen && shopStatus.currentCycle && (
+                <View style={styles.cycleInfo}>
+                  <View style={styles.cycleInfoRow}>
+                    <CalendarDays
+                      size={16}
+                      strokeWidth={STROKE_WIDTH}
+                      color={COLORS.offWhite}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                    <Text style={styles.cycleInfoText}>
+                      {shopStatus.currentCycle.name}
+                    </Text>
+                  </View>
+                  <Text style={styles.cycleInfoDates}>
+                    Du{' '}
+                    {supabaseSalesCycleService.formatDateShort(
+                      shopStatus.currentCycle.openingDate
+                    )}{' '}
+                    au{' '}
+                    {supabaseSalesCycleService.formatDateShort(
+                      shopStatus.currentCycle.closingDate
+                    )}
+                  </Text>
+                </View>
+              )}
+
+              {!shopStatus?.isOpen && shopStatus?.nextCycle && (
+                <View style={styles.cycleInfo}>
+                  <View style={styles.cycleInfoRow}>
+                    <Clock
+                      size={16}
+                      strokeWidth={STROKE_WIDTH}
+                      color={COLORS.offWhite}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                    <Text style={styles.cycleInfoText}>
+                      Prochaine ouverture dans {shopStatus.daysUntilNextOpening}{' '}
+                      {shopStatus.daysUntilNextOpening === 1 ? 'jour' : 'jours'}
+                    </Text>
+                  </View>
+                  <Text style={styles.cycleInfoDates}>
+                    {shopStatus.nextCycle.name}
+                  </Text>
+                </View>
+              )}
+
+              {/* CTA Button */}
+              {shopStatus?.isOpen && (
+                <TouchableOpacity
+                  style={styles.heroCta}
+                  onPress={() => router.push('/shop')}
+                  activeOpacity={0.9}
+                >
+                  <ShoppingBag
+                    size={ICON_SIZE_SM}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.darkGreen}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  <Text style={styles.heroCtaText}>DÉCOUVRIR NOS PRODUITS</Text>
+                  <ArrowRight
+                    size={ICON_SIZE_SM}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.darkGreen}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          </LinearGradient>
+        </ImageBackground>
+
+        {/* Content Section */}
+        <View style={[styles.content, { width: contentWidth, alignSelf: 'center' }]}>
+          {/* Welcome Section */}
+          <View style={styles.welcomeSection}>
+            <Text style={styles.sectionLabel}>LE JARDIN DU BON</Text>
+            <Text style={styles.welcomeTitle}>Gart</Text>
+            <Text style={styles.welcomeDescription}>
+              Découvrez nos légumes frais et de saison, cultivés avec passion et
+              respect de l'environnement à Batilly-en-Puisaye.
+            </Text>
+          </View>
+
+          {/* Commitments Section */}
+          <View style={styles.commitmentsSection}>
+            <Text style={styles.sectionLabel}>NOS ENGAGEMENTS</Text>
+
+            <View style={styles.commitmentCard}>
+              <View style={styles.commitmentIconContainer}>
+                <MapPin
+                  size={ICON_SIZE}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.leaf}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </View>
+              <View style={styles.commitmentContent}>
+                <Text style={styles.commitmentTitle}>Produits 100% locaux</Text>
+                <Text style={styles.commitmentText}>
+                  Cultivés à Batilly-en-Puisaye, à moins de 5km de votre point de
+                  retrait. Circuit ultra-court garanti.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.commitmentCard}>
+              <View style={styles.commitmentIconContainer}>
+                <Leaf
+                  size={ICON_SIZE}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.leaf}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </View>
+              <View style={styles.commitmentContent}>
+                <Text style={styles.commitmentTitle}>Agriculture biologique</Text>
+                <Text style={styles.commitmentText}>
+                  Sans pesticides ni produits chimiques. Des légumes sains cultivés
+                  dans le respect de la terre.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.commitmentCard}>
+              <View style={styles.commitmentIconContainer}>
+                <CalendarDays
+                  size={ICON_SIZE}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.leaf}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </View>
+              <View style={styles.commitmentContent}>
+                <Text style={styles.commitmentTitle}>Vente hebdomadaire</Text>
+                <Text style={styles.commitmentText}>
+                  Boutique ouverte une fois par semaine pour garantir la fraîcheur
+                  optimale de vos produits.
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* About Link */}
+          <TouchableOpacity
+            style={styles.aboutButton}
+            onPress={() => router.push('/about')}
+            activeOpacity={0.8}
+          >
+            <View style={styles.aboutButtonContent}>
+              <Info
+                size={ICON_SIZE_SM}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.sage}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <Text style={styles.aboutButtonText}>En savoir plus sur la ferme</Text>
+            </View>
+            <ArrowRight
+              size={ICON_SIZE_SM}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.sage}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
           </TouchableOpacity>
-        )}
-      </View>
-    </ScrollView>
+
+          {/* Bottom Spacer */}
+          <View style={styles.bottomSpacer} />
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.beige,
+    backgroundColor: COLORS.offWhite,
   },
-  loadingContainer: {
+  scrollView: {
     flex: 1,
-    backgroundColor: COLORS.beige,
+  },
+  // Hero Banner
+  heroBanner: {
+    width: '100%',
+  },
+  heroGradient: {
+    flex: 1,
+  },
+  heroContent: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.xl,
+  },
+  statusBadge: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
+    marginBottom: SPACING.md,
   },
-  loadingText: {
-    marginTop: 16,
-    color: COLORS.primary,
-    fontSize: 16,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: SPACING.sm,
   },
-  banner: {
-    padding: 24,
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    color: COLORS.offWhite,
   },
-  bannerTitle: {
-    color: COLORS.white,
-    fontSize: 24,
-    fontWeight: 'bold',
+  heroTitle: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: COLORS.offWhite,
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
-  bannerText: {
-    color: COLORS.white,
-    textAlign: 'center',
+  heroSubtitle: {
     fontSize: 16,
+    color: COLORS.offWhite,
+    textAlign: 'center',
+    opacity: 0.9,
+    lineHeight: 24,
+    marginBottom: SPACING.lg,
   },
   cycleInfo: {
-    marginTop: 16,
-    paddingTop: 16,
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.3)',
+    borderTopColor: 'rgba(253, 253, 251, 0.2)',
+  },
+  cycleInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   cycleInfoText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    fontSize: 14,
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.offWhite,
   },
+  cycleInfoDates: {
+    fontSize: 13,
+    color: COLORS.offWhite,
+    opacity: 0.8,
+  },
+  heroCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.offWhite,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: 25,
+    gap: SPACING.sm,
+    ...SHADOWS.lg,
+  },
+  heroCtaText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+    letterSpacing: 1,
+  },
+  // Content
   content: {
-    padding: 24,
+    marginTop: -SPACING.lg,
+    paddingTop: SPACING.xl,
   },
-  title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 16,
+  // Welcome Section
+  welcomeSection: {
+    marginBottom: SPACING.xl,
   },
-  description: {
-    fontSize: 18,
-    color: '#374151',
-    marginBottom: 16,
-    lineHeight: 24,
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.sage,
+    marginBottom: SPACING.sm,
   },
-  cardsContainer: {
-    gap: 16,
+  welcomeTitle: {
+    fontSize: 42,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.xs,
   },
-  card: {
-    backgroundColor: COLORS.white,
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.beigeDark,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 8,
-  },
-  cardText: {
+  welcomeDescription: {
     fontSize: 16,
-    color: '#374151',
+    color: COLORS.gray,
+    lineHeight: 26,
   },
-  ctaButton: {
-    backgroundColor: COLORS.primary,
-    padding: 16,
-    borderRadius: 8,
-    marginTop: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+  // Commitments Section
+  commitmentsSection: {
+    marginBottom: SPACING.lg,
   },
-  ctaButtonText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: 'bold',
+  commitmentCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: BORDER_RADIUS.xxl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+    ...SHADOWS.sm,
+  },
+  commitmentIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: BORDER_RADIUS.xl,
+    backgroundColor: COLORS.offWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  commitmentContent: {
+    flex: 1,
+  },
+  commitmentTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.xs,
+  },
+  commitmentText: {
+    fontSize: 14,
+    color: COLORS.gray,
+    lineHeight: 22,
+  },
+  // About Button
+  aboutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginTop: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+  },
+  aboutButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  aboutButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.sage,
+  },
+  // Bottom Spacer
+  bottomSpacer: {
+    height: SPACING.xxl,
   },
 });

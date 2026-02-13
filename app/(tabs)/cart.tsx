@@ -8,20 +8,37 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import {
+  ShoppingBag,
+  MapPin,
+  Snowflake,
+  Truck,
+  MessageSquare,
+  Trash2,
+  ClipboardList,
+  CheckCircle,
+  AlertCircle,
+  Plus,
+  Minus,
+  X,
+  Phone,
+  Salad,
+  AlertTriangle,
+} from 'lucide-react-native';
 import { useShopStore, DeliveryType } from '../../store/shopStore';
 import { supabasePickupService, PickupLocation } from '../../services/supabasePickupService';
+import { EmptyState } from '../../components';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../constants/theme';
+import { haptics } from '../../utils/haptics';
 
-const COLORS = {
-  primary: '#2E7D32',
-  primaryDark: '#1B5E20',
-  beige: '#F5F5DC',
-  beigeDark: '#E8E8CD',
-  white: '#FFFFFF',
-  red: '#DC2626',
-  gray: '#6B7280',
-};
+const ICON_SIZE_SM = 16;
+const ICON_SIZE_MD = 20;
+const ICON_SIZE_LG = 24;
+const STROKE_WIDTH = 1.5;
 
 // Pickup Location Selection Modal - US-3.2
 function PickupLocationModal({
@@ -88,9 +105,18 @@ function PickupLocationModal({
                   </View>
                 </View>
 
-                <Text style={styles.locationAddress}>
-                  📍 {location.address}
-                </Text>
+                <View style={styles.locationAddressRow}>
+                  <MapPin
+                    size={ICON_SIZE_SM}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.darkGreen}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  <Text style={styles.locationAddress}>
+                    {location.address}
+                  </Text>
+                </View>
                 <Text style={styles.locationAddress}>
                   {location.postalCode} {location.city}
                 </Text>
@@ -125,11 +151,47 @@ function CartItem({ item }: { item: any }) {
   const { updateCartQuantity, removeFromCart, getAvailableStock } = useShopStore();
   const availableStock = getAvailableStock(item.product.id);
 
+  const handleQuantityChange = (newQuantity: number) => {
+    haptics.selection();
+    updateCartQuantity(item.product.id, newQuantity);
+  };
+
+  const handleRemove = () => {
+    haptics.warning();
+    Alert.alert(
+      'Retirer du panier',
+      `Voulez-vous retirer ${item.product.name} du panier ?`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Retirer',
+          style: 'destructive',
+          onPress: () => {
+            haptics.heavy();
+            removeFromCart(item.product.id);
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.cartItem}>
       <View style={styles.cartItemHeader}>
         {/* Product Icon */}
-        <Text style={styles.cartItemIcon}>{item.product.image_url || '🥗'}</Text>
+        <View style={styles.cartItemIconContainer}>
+          {item.product.image_url ? (
+            <Text style={styles.cartItemIcon}>{item.product.image_url}</Text>
+          ) : (
+            <Salad
+              size={28}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.leaf}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          )}
+        </View>
 
         {/* Product Details */}
         <View style={styles.cartItemDetails}>
@@ -142,22 +204,13 @@ function CartItem({ item }: { item: any }) {
         {/* Remove Button */}
         <TouchableOpacity
           style={styles.removeButton}
-          onPress={() => {
-            Alert.alert(
-              'Retirer du panier',
-              `Voulez-vous retirer ${item.product.name} du panier ?`,
-              [
-                { text: 'Annuler', style: 'cancel' },
-                {
-                  text: 'Retirer',
-                  style: 'destructive',
-                  onPress: () => removeFromCart(item.product.id),
-                },
-              ]
-            );
-          }}
+          onPress={handleRemove}
         >
-          <Text style={styles.removeButtonText}>✕</Text>
+          <X
+            size={16}
+            strokeWidth={2}
+            color={COLORS.offWhite}
+          />
         </TouchableOpacity>
       </View>
 
@@ -165,10 +218,18 @@ function CartItem({ item }: { item: any }) {
       <View style={styles.quantityRow}>
         <View style={styles.quantityControl}>
           <TouchableOpacity
-            style={styles.quantityButton}
-            onPress={() => updateCartQuantity(item.product.id, item.quantity - 1)}
+            style={[
+              styles.quantityButton,
+              item.quantity <= 1 && styles.quantityButtonDisabled,
+            ]}
+            onPress={() => handleQuantityChange(item.quantity - 1)}
+            disabled={item.quantity <= 1}
           >
-            <Text style={styles.quantityButtonText}>-</Text>
+            <Minus
+              size={16}
+              strokeWidth={2}
+              color={item.quantity <= 1 ? COLORS.sage : COLORS.offWhite}
+            />
           </TouchableOpacity>
 
           <Text style={styles.quantityText}>
@@ -182,8 +243,9 @@ function CartItem({ item }: { item: any }) {
             ]}
             onPress={() => {
               if (item.quantity < item.product.stock) {
-                updateCartQuantity(item.product.id, item.quantity + 1);
+                handleQuantityChange(item.quantity + 1);
               } else {
+                haptics.warning();
                 Alert.alert(
                   'Stock maximum atteint',
                   `Stock disponible: ${item.product.stock} ${item.product.unit}`,
@@ -193,7 +255,11 @@ function CartItem({ item }: { item: any }) {
             }}
             disabled={item.quantity >= item.product.stock}
           >
-            <Text style={styles.quantityButtonText}>+</Text>
+            <Plus
+              size={16}
+              strokeWidth={2}
+              color={item.quantity >= item.product.stock ? COLORS.sage : COLORS.offWhite}
+            />
           </TouchableOpacity>
         </View>
 
@@ -204,9 +270,18 @@ function CartItem({ item }: { item: any }) {
 
       {/* Stock Warning */}
       {availableStock <= 5 && availableStock > 0 && (
-        <Text style={styles.stockWarning}>
-          ⚠️ Plus que {availableStock} {item.product.unit} disponible(s)
-        </Text>
+        <View style={styles.stockWarningRow}>
+          <AlertTriangle
+            size={ICON_SIZE_SM}
+            strokeWidth={STROKE_WIDTH}
+            color={COLORS.warning}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <Text style={styles.stockWarning}>
+            Plus que {availableStock} {item.product.unit} disponible(s)
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -214,6 +289,7 @@ function CartItem({ item }: { item: any }) {
 
 export default function CartScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     cart,
     getCartTotal,
@@ -236,20 +312,19 @@ export default function CartScreen() {
   const cartWeight = getCartWeight();
   const [showPickupModal, setShowPickupModal] = useState(false);
 
+  // Minimum 20px padding below safe area for premium spacing
+  const topPadding = insets.top + 20;
+
   if (cart.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyIcon}>🛍️</Text>
-        <Text style={styles.emptyTitle}>Votre panier est vide</Text>
-        <Text style={styles.emptyText}>
-          Découvrez nos délicieux légumes frais et commencez vos achats !
-        </Text>
-        <TouchableOpacity
-          style={styles.shopButton}
-          onPress={() => router.push('/shop')}
-        >
-          <Text style={styles.shopButtonText}>🛒 Voir les produits</Text>
-        </TouchableOpacity>
+      <View style={[styles.emptyContainer, { paddingTop: topPadding }]}>
+        <EmptyState
+          icon={ShoppingBag}
+          title="Votre panier est vide"
+          description="Découvrez nos délicieux légumes frais et commencez vos achats !"
+          actionLabel="Voir les produits"
+          onAction={() => router.push('/shop')}
+        />
       </View>
     );
   }
@@ -259,6 +334,7 @@ export default function CartScreen() {
     const validation = canCheckout();
 
     if (!validation.valid) {
+      haptics.error();
       Alert.alert(
         'Commande incomplète',
         validation.errors.join('\n'),
@@ -267,12 +343,31 @@ export default function CartScreen() {
       return;
     }
 
-    // Navigate to Stripe checkout
+    haptics.medium();
     router.push('/checkout');
   };
 
+  const handleClearCart = () => {
+    haptics.warning();
+    Alert.alert(
+      'Vider le panier',
+      'Voulez-vous vraiment vider votre panier ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Vider',
+          style: 'destructive',
+          onPress: () => {
+            haptics.heavy();
+            clearCart();
+          },
+        },
+      ]
+    );
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: topPadding }]}>
       {/* Pickup Location Modal */}
       <PickupLocationModal
         visible={showPickupModal}
@@ -280,11 +375,19 @@ export default function CartScreen() {
         onSelect={setPickupLocation}
       />
 
-      <ScrollView style={styles.scrollView}>
-        <Text style={styles.title}>
-          🛍️ Mon panier ({cart.length} {cart.length > 1 ? 'articles' : 'article'}
-          )
-        </Text>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.titleRow}>
+          <ShoppingBag
+            size={ICON_SIZE_LG}
+            strokeWidth={STROKE_WIDTH}
+            color={COLORS.darkGreen}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <Text style={styles.title}>
+            Mon panier ({cart.length} {cart.length > 1 ? 'articles' : 'article'})
+          </Text>
+        </View>
 
         {/* Cart Items - US-3.1 */}
         {cart.map((item) => (
@@ -293,7 +396,16 @@ export default function CartScreen() {
 
         {/* Delivery Method Selection */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>🚚 Mode de livraison</Text>
+          <View style={styles.sectionTitleRow}>
+            <Truck
+              size={ICON_SIZE_MD}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.sage}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.sectionTitle}>MODE DE LIVRAISON</Text>
+          </View>
 
           <View style={styles.deliveryToggle}>
             <TouchableOpacity
@@ -303,7 +415,15 @@ export default function CartScreen() {
               ]}
               onPress={() => setDeliveryType('pickup')}
             >
-              <Text style={styles.deliveryOptionIcon}>📍</Text>
+              <View style={styles.deliveryOptionIconContainer}>
+                <MapPin
+                  size={ICON_SIZE_MD}
+                  strokeWidth={STROKE_WIDTH}
+                  color={deliveryType === 'pickup' ? COLORS.leaf : COLORS.sage}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </View>
               <View style={styles.deliveryOptionInfo}>
                 <Text
                   style={[
@@ -316,7 +436,13 @@ export default function CartScreen() {
                 <Text style={styles.deliveryOptionSubtitle}>Gratuit</Text>
               </View>
               {deliveryType === 'pickup' && (
-                <Text style={styles.deliveryOptionCheck}>✓</Text>
+                <CheckCircle
+                  size={ICON_SIZE_MD}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.leaf}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
               )}
             </TouchableOpacity>
 
@@ -327,7 +453,15 @@ export default function CartScreen() {
               ]}
               onPress={() => setDeliveryType('chronofresh')}
             >
-              <Text style={styles.deliveryOptionIcon}>❄️</Text>
+              <View style={styles.deliveryOptionIconContainer}>
+                <Snowflake
+                  size={ICON_SIZE_MD}
+                  strokeWidth={STROKE_WIDTH}
+                  color={deliveryType === 'chronofresh' ? COLORS.leaf : COLORS.sage}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </View>
               <View style={styles.deliveryOptionInfo}>
                 <Text
                   style={[
@@ -342,7 +476,13 @@ export default function CartScreen() {
                 </Text>
               </View>
               {deliveryType === 'chronofresh' && (
-                <Text style={styles.deliveryOptionCheck}>✓</Text>
+                <CheckCircle
+                  size={ICON_SIZE_MD}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.leaf}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
               )}
             </TouchableOpacity>
           </View>
@@ -351,7 +491,16 @@ export default function CartScreen() {
         {/* Pickup Location Selection - US-3.2 */}
         {deliveryType === 'pickup' && (
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>📍 Point de retrait</Text>
+            <View style={styles.sectionTitleRow}>
+              <MapPin
+                size={ICON_SIZE_MD}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.sage}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <Text style={styles.sectionTitle}>POINT DE RETRAIT</Text>
+            </View>
 
             {selectedPickupLocation ? (
               <View style={styles.selectedLocationCard}>
@@ -371,9 +520,18 @@ export default function CartScreen() {
                   </View>
                 </View>
 
-                <Text style={styles.selectedLocationAddress}>
-                  📍 {selectedPickupLocation.address}, {selectedPickupLocation.postalCode} {selectedPickupLocation.city}
-                </Text>
+                <View style={styles.selectedLocationAddressRow}>
+                  <MapPin
+                    size={ICON_SIZE_SM}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.sage}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  <Text style={styles.selectedLocationAddress}>
+                    {selectedPickupLocation.address}, {selectedPickupLocation.postalCode} {selectedPickupLocation.city}
+                  </Text>
+                </View>
 
                 <TouchableOpacity
                   style={styles.changeLocationButton}
@@ -389,8 +547,15 @@ export default function CartScreen() {
                 style={styles.selectLocationButton}
                 onPress={() => setShowPickupModal(true)}
               >
+                <Plus
+                  size={ICON_SIZE_MD}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.leaf}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
                 <Text style={styles.selectLocationButtonText}>
-                  ➕ Choisir un point de retrait
+                  Choisir un point de retrait
                 </Text>
               </TouchableOpacity>
             )}
@@ -400,7 +565,16 @@ export default function CartScreen() {
         {/* Delivery Address Section - Chronofresh */}
         {deliveryType === 'chronofresh' && (
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>📍 Adresse de livraison</Text>
+            <View style={styles.sectionTitleRow}>
+              <MapPin
+                size={ICON_SIZE_MD}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.sage}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <Text style={styles.sectionTitle}>ADRESSE DE LIVRAISON</Text>
+            </View>
 
             {deliveryAddress ? (
               <View style={styles.selectedLocationCard}>
@@ -410,17 +584,35 @@ export default function CartScreen() {
                   <Text style={styles.deliveryAddressText}>
                     {deliveryAddress.postalCode} {deliveryAddress.city}
                   </Text>
-                  <Text style={styles.deliveryAddressPhone}>📞 {deliveryAddress.phone}</Text>
+                  <View style={styles.deliveryAddressPhoneRow}>
+                    <Phone
+                      size={ICON_SIZE_SM}
+                      strokeWidth={STROKE_WIDTH}
+                      color={COLORS.sage}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                    />
+                    <Text style={styles.deliveryAddressPhone}>{deliveryAddress.phone}</Text>
+                  </View>
                   {deliveryAddress.instructions && (
-                    <Text style={styles.deliveryAddressInstructions}>
-                      💬 {deliveryAddress.instructions}
-                    </Text>
+                    <View style={styles.deliveryAddressInstructionsRow}>
+                      <MessageSquare
+                        size={ICON_SIZE_SM}
+                        strokeWidth={STROKE_WIDTH}
+                        color={COLORS.sage}
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                      <Text style={styles.deliveryAddressInstructions}>
+                        {deliveryAddress.instructions}
+                      </Text>
+                    </View>
                   )}
                 </View>
 
                 {shippingLoading ? (
                   <View style={styles.shippingLoadingContainer}>
-                    <ActivityIndicator size="small" color={COLORS.primary} />
+                    <ActivityIndicator size="small" color={COLORS.leaf} />
                     <Text style={styles.shippingLoadingText}>Calcul des frais...</Text>
                   </View>
                 ) : shippingError ? (
@@ -433,9 +625,18 @@ export default function CartScreen() {
                       <Text style={styles.shippingRateLabel}>Zone: {shippingRate.zone}</Text>
                       <Text style={styles.shippingRateValue}>{shippingRate.price.toFixed(2)} €</Text>
                     </View>
-                    <Text style={styles.shippingRateDelivery}>
-                      🚚 Livraison en {shippingRate.estimatedDaysMin}-{shippingRate.estimatedDaysMax} jours ouvrés
-                    </Text>
+                    <View style={styles.shippingRateDeliveryRow}>
+                      <Truck
+                        size={ICON_SIZE_SM}
+                        strokeWidth={STROKE_WIDTH}
+                        color={COLORS.sage}
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                      <Text style={styles.shippingRateDelivery}>
+                        Livraison en {shippingRate.estimatedDaysMin}-{shippingRate.estimatedDaysMax} jours ouvrés
+                      </Text>
+                    </View>
                   </View>
                 )}
 
@@ -453,16 +654,30 @@ export default function CartScreen() {
                 style={styles.selectLocationButton}
                 onPress={() => router.push('/delivery-address')}
               >
+                <Plus
+                  size={ICON_SIZE_MD}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.leaf}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
                 <Text style={styles.selectLocationButtonText}>
-                  ➕ Entrer une adresse de livraison
+                  Entrer une adresse de livraison
                 </Text>
               </TouchableOpacity>
             )}
 
             {/* Cold Chain Info */}
             <View style={styles.coldChainInfo}>
+              <Snowflake
+                size={ICON_SIZE_MD}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.darkGreen}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
               <Text style={styles.coldChainInfoText}>
-                ❄️ Livraison en chaîne du froid garantie
+                Livraison en chaîne du froid garantie
               </Text>
             </View>
           </View>
@@ -470,7 +685,16 @@ export default function CartScreen() {
 
         {/* Order Summary - US-3.1 */}
         <View style={styles.sectionContainer}>
-          <Text style={styles.sectionTitle}>📋 Récapitulatif</Text>
+          <View style={styles.sectionTitleRow}>
+            <ClipboardList
+              size={ICON_SIZE_MD}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.sage}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.sectionTitle}>RECAPITULATIF</Text>
+          </View>
 
           <View style={styles.summaryCard}>
             <View style={styles.summaryRow}>
@@ -501,22 +725,18 @@ export default function CartScreen() {
         {/* Clear Cart Button */}
         <TouchableOpacity
           style={styles.clearButton}
-          onPress={() => {
-            Alert.alert(
-              'Vider le panier',
-              'Voulez-vous vraiment vider votre panier ?',
-              [
-                { text: 'Annuler', style: 'cancel' },
-                {
-                  text: 'Vider',
-                  style: 'destructive',
-                  onPress: clearCart,
-                },
-              ]
-            );
-          }}
+          onPress={handleClearCart}
         >
-          <Text style={styles.clearButtonText}>🗑️ Vider le panier</Text>
+          <View style={styles.clearButtonContent}>
+            <Trash2
+              size={ICON_SIZE_SM}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.error}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.clearButtonText}>Vider le panier</Text>
+          </View>
         </TouchableOpacity>
       </ScrollView>
 
@@ -534,13 +754,32 @@ export default function CartScreen() {
           ]}
           onPress={handleCheckout}
         >
-          <Text style={styles.checkoutButtonText}>
-            {canCheckout().valid
-              ? '✅ Valider la commande'
-              : deliveryType === 'pickup'
-                ? '⚠️ Choisir un point de retrait'
-                : '⚠️ Entrer une adresse de livraison'}
-          </Text>
+          <View style={styles.checkoutButtonContent}>
+            {canCheckout().valid ? (
+              <CheckCircle
+                size={ICON_SIZE_MD}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.offWhite}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            ) : (
+              <AlertCircle
+                size={ICON_SIZE_MD}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.offWhite}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+            )}
+            <Text style={styles.checkoutButtonText}>
+              {canCheckout().valid
+                ? 'Valider la commande'
+                : deliveryType === 'pickup'
+                  ? 'Choisir un point de retrait'
+                  : 'Entrer une adresse de livraison'}
+            </Text>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -550,98 +789,76 @@ export default function CartScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.beige,
+    backgroundColor: COLORS.offWhite,
   },
   scrollView: {
     flex: 1,
-    padding: 16,
+    padding: SPACING.lg,
   },
   emptyContainer: {
     flex: 1,
-    backgroundColor: COLORS.beige,
+    backgroundColor: COLORS.offWhite,
+  },
+  titleRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  emptyText: {
-    color: COLORS.gray,
-    textAlign: 'center',
-    marginBottom: 24,
-    fontSize: 16,
-  },
-  shopButton: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 8,
-  },
-  shopButtonText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
-    fontSize: 18,
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 16,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   cartItem: {
     backgroundColor: COLORS.white,
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.beigeDark,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderColor: COLORS.borderCream,
+    ...SHADOWS.sm,
   },
   cartItemHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  cartItemIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.offWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
   cartItemIcon: {
-    fontSize: 40,
-    marginRight: 12,
+    fontSize: 28,
   },
   cartItemDetails: {
     flex: 1,
   },
   cartItemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.xs,
   },
   cartItemPrice: {
-    color: COLORS.primaryDark,
+    color: COLORS.leaf,
     fontWeight: '600',
   },
   removeButton: {
-    backgroundColor: COLORS.red,
+    backgroundColor: COLORS.error,
     width: 32,
     height: 32,
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   removeButtonText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
+    color: COLORS.offWhite,
+    fontWeight: '700',
   },
   quantityRow: {
     flexDirection: 'row',
@@ -652,99 +869,113 @@ const styles = StyleSheet.create({
   quantityControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.beige,
-    borderRadius: 4,
-    padding: 8,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.sm,
     flex: 1,
     justifyContent: 'space-between',
-    marginRight: 16,
+    marginRight: SPACING.md,
   },
   quantityButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.leaf,
     width: 32,
     height: 32,
-    borderRadius: 4,
+    borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   quantityButtonDisabled: {
-    backgroundColor: COLORS.gray,
-    opacity: 0.5,
+    backgroundColor: COLORS.borderCream,
   },
   quantityButtonText: {
-    color: COLORS.white,
-    fontWeight: 'bold',
+    color: COLORS.offWhite,
+    fontWeight: '700',
     fontSize: 18,
   },
   quantityText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   itemTotal: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.primaryDark,
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.leaf,
   },
   clearButton: {
-    backgroundColor: '#FEE2E2',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
+    backgroundColor: COLORS.errorLight,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    marginTop: SPACING.sm,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: COLORS.error,
+  },
+  clearButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
   clearButtonText: {
-    color: COLORS.red,
-    textAlign: 'center',
+    color: COLORS.error,
     fontWeight: '600',
+    fontSize: 14,
   },
   footer: {
     backgroundColor: COLORS.white,
-    borderTopWidth: 2,
-    borderTopColor: COLORS.primary,
-    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderCream,
+    padding: SPACING.lg,
+    ...SHADOWS.md,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   totalLabel: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#374151',
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.gray,
+    letterSpacing: 0.5,
   },
   totalAmount: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   checkoutButton: {
-    backgroundColor: COLORS.primary,
-    padding: 16,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    backgroundColor: COLORS.darkGreen,
+    paddingVertical: SPACING.lg,
+    borderRadius: 25,
+    ...SHADOWS.lg,
   },
   checkoutButtonDisabled: {
-    backgroundColor: COLORS.gray,
-    opacity: 0.6,
+    backgroundColor: COLORS.sage,
+    opacity: 0.7,
+  },
+  checkoutButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
   checkoutButtonText: {
-    color: COLORS.white,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: COLORS.offWhite,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  stockWarningRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
   },
   stockWarning: {
-    marginTop: 8,
     fontSize: 12,
-    color: '#F59E0B',
+    color: COLORS.warning,
     fontWeight: '600',
   },
   // Pickup Location Modal
@@ -755,16 +986,16 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    borderTopLeftRadius: BORDER_RADIUS.xxl,
+    borderTopRightRadius: BORDER_RADIUS.xxl,
+    padding: SPACING.lg,
     maxHeight: '80%',
   },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.md,
     textAlign: 'center',
   },
   locationList: {
@@ -772,293 +1003,328 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     textAlign: 'center',
-    color: COLORS.gray,
-    fontSize: 16,
-    padding: 20,
+    color: COLORS.sage,
+    fontSize: 14,
+    padding: SPACING.lg,
   },
   locationCard: {
-    backgroundColor: COLORS.beige,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: COLORS.beigeDark,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
   },
   locationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   locationIcon: {
     fontSize: 40,
-    marginRight: 12,
+    marginRight: SPACING.md,
   },
   locationInfo: {
     flex: 1,
   },
   locationName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   locationType: {
-    fontSize: 14,
-    color: COLORS.gray,
+    fontSize: 13,
+    color: COLORS.sage,
+  },
+  locationAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.xs,
   },
   locationAddress: {
     fontSize: 14,
-    color: COLORS.primaryDark,
-    marginBottom: 4,
+    color: COLORS.darkGreen,
+    flex: 1,
   },
   locationDescription: {
     fontSize: 13,
     color: COLORS.gray,
-    marginTop: 8,
-    marginBottom: 8,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   openingHoursContainer: {
-    marginTop: 8,
-    padding: 12,
+    marginTop: SPACING.sm,
+    padding: SPACING.md,
     backgroundColor: COLORS.white,
-    borderRadius: 8,
+    borderRadius: BORDER_RADIUS.lg,
   },
   openingHoursTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 6,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.sm,
+    textTransform: 'uppercase',
   },
   openingHoursText: {
     fontSize: 13,
-    color: '#374151',
+    color: COLORS.gray,
     marginBottom: 2,
   },
   modalCloseButton: {
-    backgroundColor: COLORS.beigeDark,
-    padding: 16,
-    borderRadius: 8,
-    marginTop: 16,
+    backgroundColor: COLORS.offWhite,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    marginTop: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
   },
   modalCloseButtonText: {
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: COLORS.gray,
+    color: COLORS.sage,
   },
   // Pickup Location Selection Section
   sectionContainer: {
-    marginTop: 24,
-    marginBottom: 16,
+    marginTop: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 12,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.sage,
+    textTransform: 'uppercase',
   },
   selectLocationButton: {
     backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.leaf,
     borderStyle: 'dashed',
-    borderRadius: 8,
-    padding: 20,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.lg,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
   selectLocationButtonText: {
-    color: COLORS.primary,
-    fontSize: 16,
+    color: COLORS.leaf,
+    fontSize: 14,
     fontWeight: '600',
   },
   selectedLocationCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
     borderWidth: 2,
-    borderColor: COLORS.primary,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: COLORS.leaf,
+    ...SHADOWS.sm,
   },
   selectedLocationHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   selectedLocationIcon: {
     fontSize: 40,
-    marginRight: 12,
+    marginRight: SPACING.md,
   },
   selectedLocationInfo: {
     flex: 1,
   },
   selectedLocationName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   selectedLocationType: {
-    fontSize: 14,
-    color: COLORS.gray,
+    fontSize: 13,
+    color: COLORS.sage,
+  },
+  selectedLocationAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
   },
   selectedLocationAddress: {
     fontSize: 14,
-    color: COLORS.primaryDark,
-    marginBottom: 12,
+    color: COLORS.darkGreen,
+    flex: 1,
   },
   changeLocationButton: {
-    backgroundColor: COLORS.beige,
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.offWhite,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.beigeDark,
+    borderColor: COLORS.borderCream,
   },
   changeLocationButtonText: {
     textAlign: 'center',
-    color: COLORS.primary,
+    color: COLORS.leaf,
     fontWeight: '600',
   },
   // Order Summary
   summaryCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.beigeDark,
+    borderColor: COLORS.borderCream,
+    ...SHADOWS.sm,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   summaryLabel: {
-    fontSize: 16,
-    color: '#374151',
+    fontSize: 14,
+    color: COLORS.gray,
   },
   summaryValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.darkGreen,
   },
   summaryRowTotal: {
-    borderTopWidth: 2,
-    borderTopColor: COLORS.beigeDark,
-    paddingTop: 12,
-    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderCream,
+    paddingTop: SPACING.md,
+    marginTop: SPACING.xs,
     marginBottom: 0,
   },
   summaryLabelTotal: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   summaryValueTotal: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.leaf,
   },
   // Delivery Method Toggle
   deliveryToggle: {
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
   },
   deliveryOption: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
     borderWidth: 2,
-    borderColor: COLORS.beigeDark,
+    borderColor: COLORS.borderCream,
   },
   deliveryOptionActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: '#E8F5E9',
+    borderColor: COLORS.leaf,
+    backgroundColor: COLORS.offWhite,
   },
-  deliveryOptionIcon: {
-    fontSize: 24,
-    marginRight: 12,
+  deliveryOptionIconContainer: {
+    marginRight: SPACING.md,
   },
   deliveryOptionInfo: {
     flex: 1,
   },
   deliveryOptionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.darkGreen,
   },
   deliveryOptionTitleActive: {
-    color: COLORS.primary,
+    color: COLORS.leaf,
   },
   deliveryOptionSubtitle: {
-    fontSize: 14,
-    color: COLORS.gray,
+    fontSize: 13,
+    color: COLORS.sage,
     marginTop: 2,
   },
   deliveryOptionCheck: {
     fontSize: 18,
-    color: COLORS.primary,
+    color: COLORS.leaf,
     fontWeight: 'bold',
   },
   // Delivery Address
   deliveryAddressContent: {
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   deliveryAddressName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 4,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.xs,
   },
   deliveryAddressText: {
     fontSize: 14,
-    color: '#374151',
+    color: COLORS.gray,
     marginBottom: 2,
+  },
+  deliveryAddressPhoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.xs,
   },
   deliveryAddressPhone: {
     fontSize: 14,
-    color: COLORS.gray,
-    marginTop: 4,
+    color: COLORS.sage,
+  },
+  deliveryAddressInstructionsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.xs,
+    marginTop: SPACING.xs,
   },
   deliveryAddressInstructions: {
     fontSize: 13,
-    color: COLORS.gray,
+    color: COLORS.sage,
     fontStyle: 'italic',
-    marginTop: 4,
+    flex: 1,
   },
   // Shipping Rate Display
   shippingLoadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    backgroundColor: COLORS.beige,
-    borderRadius: 8,
-    marginBottom: 12,
+    padding: SPACING.md,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.md,
   },
   shippingLoadingText: {
-    marginLeft: 8,
-    color: COLORS.gray,
+    marginLeft: SPACING.sm,
+    color: COLORS.sage,
   },
   shippingErrorContainer: {
-    padding: 12,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-    marginBottom: 12,
+    padding: SPACING.md,
+    backgroundColor: COLORS.errorLight,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.md,
   },
   shippingErrorText: {
-    color: COLORS.red,
+    color: COLORS.error,
     textAlign: 'center',
   },
   shippingRateContainer: {
-    padding: 12,
-    backgroundColor: '#E8F5E9',
-    borderRadius: 8,
-    marginBottom: 12,
+    padding: SPACING.md,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.leaf,
   },
   shippingRateRow: {
     flexDirection: 'row',
@@ -1067,27 +1333,38 @@ const styles = StyleSheet.create({
   },
   shippingRateLabel: {
     fontSize: 14,
-    color: COLORS.primaryDark,
+    color: COLORS.darkGreen,
   },
   shippingRateValue: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontWeight: '700',
+    color: COLORS.leaf,
+  },
+  shippingRateDeliveryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.xs,
   },
   shippingRateDelivery: {
     fontSize: 13,
-    color: COLORS.primaryDark,
-    marginTop: 4,
+    color: COLORS.sage,
   },
   coldChainInfo: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#EBF8FF',
-    borderRadius: 8,
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
   coldChainInfoText: {
     fontSize: 14,
-    color: '#1E40AF',
-    textAlign: 'center',
+    color: COLORS.darkGreen,
+    fontWeight: '600',
   },
 });

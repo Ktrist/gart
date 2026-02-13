@@ -15,22 +15,21 @@ import {
   Alert,
   ScrollView,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { CreditCard, Shield, Smartphone, Salad, ChevronLeft } from 'lucide-react-native';
 import { useStripe } from '../utils/stripe';
 import { useShopStore } from '../store/shopStore';
 import { stripeService } from '../services/stripeService';
 import { supabaseApiService } from '../services/supabaseApi';
 import { useAuth } from '../contexts/AuthContext';
+import { LoadingScreen } from '../components';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 
-const COLORS = {
-  primary: '#2E7D32',
-  primaryDark: '#1B5E20',
-  beige: '#F5F5DC',
-  white: '#FFFFFF',
-  red: '#DC2626',
-  gray: '#6B7280',
-};
+const ICON_SIZE = 24;
+const STROKE_WIDTH = 1.5;
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -259,7 +258,16 @@ export default function CheckoutScreen() {
   if (Platform.OS === 'web') {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.webTitle}>📱 Application Mobile Requise</Text>
+        <View style={styles.webTitleRow}>
+          <Smartphone
+            size={ICON_SIZE}
+            strokeWidth={STROKE_WIDTH}
+            color={COLORS.darkGreen}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <Text style={styles.webTitle}>Application Mobile Requise</Text>
+        </View>
         <Text style={styles.webText}>
           Le paiement Stripe n'est disponible que sur l'application mobile iOS ou Android.
         </Text>
@@ -274,18 +282,40 @@ export default function CheckoutScreen() {
   }
 
   if (loading && !paymentReady) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Préparation du paiement...</Text>
-      </View>
-    );
+    return <LoadingScreen message="Préparation du paiement..." />;
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>💳 Paiement sécurisé</Text>
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          {/* Header with back button */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <ChevronLeft
+                size={20}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.leaf}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <Text style={styles.backButtonText}>Retour</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.titleRow}>
+            <CreditCard
+              size={ICON_SIZE}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.darkGreen}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.title}>Paiement sécurisé</Text>
+          </View>
 
         {/* Résumé de la commande */}
         <View style={styles.summaryCard}>
@@ -334,7 +364,19 @@ export default function CheckoutScreen() {
           <Text style={styles.productsTitle}>Vos produits</Text>
           {cart.map((item) => (
             <View key={item.product.id} style={styles.productRow}>
-              <Text style={styles.productIcon}>{item.product.image_url}</Text>
+              <View style={styles.productIconContainer}>
+                {item.product.image_url ? (
+                  <Text style={styles.productIcon}>{item.product.image_url}</Text>
+                ) : (
+                  <Salad
+                    size={24}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.leaf}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                )}
+              </View>
               <View style={styles.productInfo}>
                 <Text style={styles.productName}>{item.product.name}</Text>
                 <Text style={styles.productQuantity}>
@@ -350,7 +392,16 @@ export default function CheckoutScreen() {
 
         {/* Informations de sécurité */}
         <View style={styles.securityCard}>
-          <Text style={styles.securityTitle}>🔒 Paiement sécurisé</Text>
+          <View style={styles.securityTitleRow}>
+            <Shield
+              size={20}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.darkGreen}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.securityTitle}>Paiement sécurisé</Text>
+          </View>
           <Text style={styles.securityText}>
             Vos informations bancaires sont protégées par Stripe, leader mondial
             du paiement en ligne. Nous ne stockons aucune donnée de carte bancaire.
@@ -380,117 +431,152 @@ export default function CheckoutScreen() {
         >
           <Text style={styles.cancelButtonText}>Annuler</Text>
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+          {/* Bottom spacer */}
+          <View style={styles.bottomSpacer} />
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.beige,
+    backgroundColor: COLORS.offWhite,
   },
-  loadingContainer: {
+  scrollView: {
     flex: 1,
-    backgroundColor: COLORS.beige,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 16,
-    color: COLORS.primary,
-    fontSize: 16,
+  webTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
   },
   webTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 20,
-    textAlign: 'center',
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   webText: {
     fontSize: 16,
     color: COLORS.gray,
-    marginBottom: 16,
+    marginBottom: SPACING.md,
     textAlign: 'center',
-    paddingHorizontal: 40,
+    paddingHorizontal: SPACING.xxl,
     lineHeight: 24,
   },
   content: {
-    padding: 16,
+    padding: SPACING.lg,
+  },
+  header: {
+    marginBottom: SPACING.md,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: COLORS.leaf,
+    fontWeight: '600',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 24,
-    textAlign: 'center',
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   summaryCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.xxl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.leaf,
+    ...SHADOWS.sm,
   },
   summaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 16,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.sage,
+    marginBottom: SPACING.md,
+    textTransform: 'uppercase',
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   summaryLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.gray,
   },
   summaryValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.darkGreen,
   },
   totalRow: {
-    borderTopWidth: 2,
-    borderTopColor: COLORS.beige,
-    paddingTop: 12,
-    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderCream,
+    paddingTop: SPACING.md,
+    marginTop: SPACING.sm,
     marginBottom: 0,
   },
   totalLabel: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   totalValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.leaf,
   },
   productsCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+    ...SHADOWS.sm,
   },
   productsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 12,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.sage,
+    marginBottom: SPACING.md,
+    textTransform: 'uppercase',
   },
   productRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
+  },
+  productIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.offWhite,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
   },
   productIcon: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: 24,
   },
   productInfo: {
     flex: 1,
@@ -498,62 +584,69 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.darkGreen,
   },
   productQuantity: {
     fontSize: 12,
-    color: COLORS.gray,
+    color: COLORS.sage,
   },
   productPrice: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontWeight: '700',
+    color: COLORS.leaf,
   },
   securityCard: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+  },
+  securityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   securityTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   securityText: {
-    fontSize: 14,
-    color: '#2E7D32',
+    fontSize: 13,
+    color: COLORS.sage,
     lineHeight: 20,
   },
   payButton: {
-    backgroundColor: COLORS.primary,
-    padding: 18,
-    borderRadius: 12,
+    backgroundColor: COLORS.darkGreen,
+    paddingVertical: SPACING.lg,
+    borderRadius: 25,
     alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    marginBottom: SPACING.md,
+    ...SHADOWS.lg,
   },
   payButtonDisabled: {
-    backgroundColor: COLORS.gray,
+    backgroundColor: COLORS.sage,
     opacity: 0.6,
   },
   payButtonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: 'bold',
+    color: COLORS.offWhite,
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 1,
   },
   cancelButton: {
-    padding: 16,
+    padding: SPACING.md,
     alignItems: 'center',
   },
   cancelButtonText: {
-    color: COLORS.gray,
-    fontSize: 16,
+    color: COLORS.sage,
+    fontSize: 14,
     fontWeight: '600',
+  },
+  bottomSpacer: {
+    height: SPACING.xl,
   },
 });

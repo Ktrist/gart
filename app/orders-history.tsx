@@ -12,23 +12,47 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
+  ImageBackground,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import {
+  Package,
+  Lock,
+  Clock,
+  CheckCircle,
+  Check,
+  X,
+  ChevronLeft,
+  RefreshCw,
+  ShoppingBag,
+  AlertCircle,
+} from 'lucide-react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { useShopStore } from '../store/shopStore';
 import { supabase } from '../services/supabase';
+import { LoadingScreen, EmptyState } from '../components';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
+import { haptics } from '../utils/haptics';
 
-const COLORS = {
-  primary: '#2E7D32',
-  beige: '#F5F5DC',
-  white: '#FFFFFF',
-  gray: '#6B7280',
-  lightGray: '#E5E7EB',
-  green: '#10B981',
-  orange: '#F59E0B',
-  red: '#DC2626',
+// Aerial field image for hero
+const AERIAL_FIELD_IMAGE = {
+  uri: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&q=80',
 };
+
+const ICON_SIZE = 20;
+const STROKE_WIDTH = 1.5;
+
+interface OrderItem {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  product_unit: string;
+}
 
 interface Order {
   id: string;
@@ -39,24 +63,37 @@ interface Order {
   pickup_location?: {
     name: string;
   };
-  order_items: Array<{
-    product_name: string;
-    quantity: number;
-    unit_price: number;
-    product_unit: string;
-  }>;
+  order_items: OrderItem[];
 }
 
 export default function OrdersHistoryScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { products, addToCart, fetchProducts } = useShopStore();
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+
+  const heroHeight = height * 0.18;
+  const contentWidth = width * 0.9;
+  // Minimum 20px padding below safe area for premium spacing
+  const heroTopPadding = insets.top + 20;
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [reorderResult, setReorderResult] = useState<{
+    orderId: string;
+    added: number;
+    unavailable: string[];
+  } | null>(null);
 
   useEffect(() => {
     loadOrders();
+    // Load products for reorder functionality
+    if (products.length === 0) {
+      fetchProducts();
+    }
   }, []);
 
   /**
@@ -79,6 +116,7 @@ export default function OrdersHistoryScreen() {
           created_at,
           pickup_locations (name),
           order_items (
+            product_id,
             product_name,
             quantity,
             unit_price,
@@ -100,6 +138,67 @@ export default function OrdersHistoryScreen() {
   };
 
   /**
+   * Re-commander les produits d'une commande précédente
+   */
+  const handleReorder = async (order: Order) => {
+    haptics.medium();
+    setReorderingId(order.id);
+    setReorderResult(null);
+
+    let addedCount = 0;
+    const unavailableItems: string[] = [];
+
+    for (const item of order.order_items) {
+      // Find the product in the current product list
+      const product = products.find(
+        (p) => p.uuid === item.product_id || p.id.toString() === item.product_id || p.name === item.product_name
+      );
+
+      if (!product) {
+        unavailableItems.push(item.product_name);
+        continue;
+      }
+
+      if (!product.available || product.stock === 0) {
+        unavailableItems.push(`${item.product_name} (rupture)`);
+        continue;
+      }
+
+      // Determine quantity to add (limited by available stock)
+      const quantityToAdd = Math.min(item.quantity, product.stock);
+
+      if (quantityToAdd < item.quantity) {
+        unavailableItems.push(`${item.product_name} (stock limité: ${product.stock})`);
+      }
+
+      if (quantityToAdd > 0) {
+        const success = addToCart(product, quantityToAdd);
+        if (success) {
+          addedCount++;
+        }
+      }
+    }
+
+    setReorderResult({
+      orderId: order.id,
+      added: addedCount,
+      unavailable: unavailableItems,
+    });
+
+    setReorderingId(null);
+
+    // Navigate to cart if items were added
+    if (addedCount > 0) {
+      haptics.success();
+      setTimeout(() => {
+        router.push('/(tabs)/cart');
+      }, 1500);
+    } else if (unavailableItems.length > 0) {
+      haptics.warning();
+    }
+  };
+
+  /**
    * Rafraîchir la liste
    */
   const onRefresh = () => {
@@ -111,20 +210,61 @@ export default function OrdersHistoryScreen() {
    * Obtenir le badge de statut
    */
   const getStatusBadge = (status: string) => {
-    const badges: Record<string, { label: string; color: string }> = {
-      pending: { label: '⏳ En attente', color: COLORS.orange },
-      confirmed: { label: '✅ Confirmée', color: COLORS.green },
-      ready: { label: '📦 Prête', color: COLORS.green },
-      completed: { label: '✓ Récupérée', color: COLORS.gray },
-      cancelled: { label: '✕ Annulée', color: COLORS.red },
+    const getStatusConfig = (s: string) => {
+      switch (s) {
+        case 'pending':
+          return {
+            label: 'En attente',
+            color: COLORS.warning,
+            Icon: Clock,
+          };
+        case 'confirmed':
+          return {
+            label: 'Confirmée',
+            color: COLORS.leaf,
+            Icon: CheckCircle,
+          };
+        case 'ready':
+          return {
+            label: 'Prête',
+            color: COLORS.leaf,
+            Icon: Package,
+          };
+        case 'completed':
+          return {
+            label: 'Récupérée',
+            color: COLORS.sage,
+            Icon: Check,
+          };
+        case 'cancelled':
+          return {
+            label: 'Annulée',
+            color: COLORS.error,
+            Icon: X,
+          };
+        default:
+          return {
+            label: s,
+            color: COLORS.sage,
+            Icon: Clock,
+          };
+      }
     };
 
-    const badge = badges[status] || { label: status, color: COLORS.gray };
+    const config = getStatusConfig(status);
+    const { Icon } = config;
 
     return (
-      <View style={[styles.statusBadge, { backgroundColor: badge.color + '20' }]}>
-        <Text style={[styles.statusText, { color: badge.color }]}>
-          {badge.label}
+      <View style={[styles.statusBadge, { backgroundColor: config.color + '20' }]}>
+        <Icon
+          size={14}
+          strokeWidth={2}
+          color={config.color}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        <Text style={[styles.statusText, { color: config.color }]}>
+          {config.label}
         </Text>
       </View>
     );
@@ -145,54 +285,38 @@ export default function OrdersHistoryScreen() {
   // Si pas connecté
   if (!user) {
     return (
-      <View style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>🔒</Text>
-          <Text style={styles.emptyTitle}>Connexion requise</Text>
-          <Text style={styles.emptyText}>
-            Connectez-vous pour accéder à votre historique de commandes
-          </Text>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push('/auth')}
-          >
-            <Text style={styles.actionButtonText}>Se connecter</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={[styles.container, { paddingTop: heroTopPadding }]}>
+        <EmptyState
+          icon={Lock}
+          title="Connexion requise"
+          description="Connectez-vous pour accéder à votre historique de commandes"
+          actionLabel="Se connecter"
+          onAction={() => router.push('/auth')}
+          secondaryActionLabel="Retour"
+          onSecondaryAction={() => router.back()}
+        />
       </View>
     );
   }
 
   // Chargement
   if (loading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={styles.loadingText}>Chargement...</Text>
-        </View>
-      </View>
-    );
+    return <LoadingScreen message="Chargement des commandes..." />;
   }
 
   // Aucune commande
   if (orders.length === 0) {
     return (
-      <View style={styles.container}>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyIcon}>📦</Text>
-          <Text style={styles.emptyTitle}>Aucune commande</Text>
-          <Text style={styles.emptyText}>
-            Vous n'avez pas encore passé de commande.{'\n'}
-            Découvrez nos produits locaux et bio !
-          </Text>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.replace('/(tabs)')}
-          >
-            <Text style={styles.actionButtonText}>Voir la boutique</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={[styles.container, { paddingTop: heroTopPadding }]}>
+        <EmptyState
+          icon={Package}
+          title="Aucune commande"
+          description="Vous n'avez pas encore passé de commande. Découvrez nos produits locaux et bio !"
+          actionLabel="Voir la boutique"
+          onAction={() => router.replace('/(tabs)')}
+          secondaryActionLabel="Retour"
+          onSecondaryAction={() => router.back()}
+        />
       </View>
     );
   }
@@ -201,24 +325,62 @@ export default function OrdersHistoryScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={styles.backButton}>← Retour</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>📦 Mes commandes</Text>
-          <Text style={styles.subtitle}>
-            {orders.length} commande{orders.length > 1 ? 's' : ''}
-          </Text>
-        </View>
+        {/* Hero Header */}
+        <ImageBackground
+          source={AERIAL_FIELD_IMAGE}
+          style={[styles.heroContainer, { height: heroHeight }]}
+          resizeMode="cover"
+        >
+          <LinearGradient
+            colors={[
+              'rgba(20, 50, 33, 0.3)',
+              'rgba(45, 90, 60, 0.9)',
+            ]}
+            style={styles.heroGradient}
+          >
+            <View style={[styles.heroContent, { paddingTop: heroTopPadding }]}>
+              {/* Back Button */}
+              <TouchableOpacity
+                style={styles.heroBackButton}
+                onPress={() => router.back()}
+              >
+                <ChevronLeft
+                  size={24}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.offWhite}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+              </TouchableOpacity>
 
-        {/* Orders List */}
-        {orders.map((order) => (
+              {/* Title */}
+              <View style={styles.heroTitleContainer}>
+                <Package
+                  size={24}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.offWhite}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+                <Text style={styles.heroTitle}>Mes commandes</Text>
+              </View>
+              <Text style={styles.heroSubtitle}>
+                {orders.length} commande{orders.length > 1 ? 's' : ''}
+              </Text>
+            </View>
+          </LinearGradient>
+        </ImageBackground>
+
+        {/* Content */}
+        <View style={[styles.content, { width: contentWidth, alignSelf: 'center' }]}>
+          {/* Orders List */}
+          {orders.map((order) => (
           <View key={order.id} style={styles.orderCard}>
             {/* Order Header */}
             <View style={styles.orderHeader}>
@@ -257,9 +419,75 @@ export default function OrdersHistoryScreen() {
                 <Text style={styles.orderTotalLabel}>Total</Text>
                 <Text style={styles.orderTotalValue}>{order.total.toFixed(2)} €</Text>
               </View>
+
+              {/* Reorder Result Message */}
+              {reorderResult?.orderId === order.id && (
+                <View style={[
+                  styles.reorderResult,
+                  reorderResult.unavailable.length > 0 && styles.reorderResultWarning,
+                ]}>
+                  {reorderResult.added > 0 ? (
+                    <View style={styles.reorderResultRow}>
+                      <ShoppingBag
+                        size={16}
+                        strokeWidth={STROKE_WIDTH}
+                        color={reorderResult.unavailable.length > 0 ? COLORS.warning : COLORS.leaf}
+                      />
+                      <Text style={[
+                        styles.reorderResultText,
+                        { color: reorderResult.unavailable.length > 0 ? COLORS.warning : COLORS.leaf },
+                      ]}>
+                        {reorderResult.added} produit{reorderResult.added > 1 ? 's' : ''} ajouté{reorderResult.added > 1 ? 's' : ''} au panier
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.reorderResultRow}>
+                      <AlertCircle
+                        size={16}
+                        strokeWidth={STROKE_WIDTH}
+                        color={COLORS.error}
+                      />
+                      <Text style={[styles.reorderResultText, { color: COLORS.error }]}>
+                        Aucun produit disponible
+                      </Text>
+                    </View>
+                  )}
+                  {reorderResult.unavailable.length > 0 && (
+                    <Text style={styles.reorderUnavailableText}>
+                      Non disponible: {reorderResult.unavailable.join(', ')}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+              {/* Reorder Button */}
+              <TouchableOpacity
+                style={[
+                  styles.reorderButton,
+                  reorderingId === order.id && styles.reorderButtonLoading,
+                ]}
+                onPress={() => handleReorder(order)}
+                disabled={reorderingId !== null}
+                activeOpacity={0.8}
+              >
+                <RefreshCw
+                  size={16}
+                  strokeWidth={STROKE_WIDTH}
+                  color={COLORS.offWhite}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                />
+                <Text style={styles.reorderButtonText}>
+                  {reorderingId === order.id ? 'Ajout en cours...' : 'Re-commander'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         ))}
+
+          {/* Bottom Spacer */}
+          <View style={styles.bottomSpacer} />
+        </View>
       </ScrollView>
     </View>
   );
@@ -268,98 +496,132 @@ export default function OrdersHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.beige,
+    backgroundColor: COLORS.offWhite,
   },
-  scrollContent: {
-    padding: 16,
-    paddingTop: 60,
+  scrollView: {
+    flex: 1,
   },
-  header: {
-    marginBottom: 24,
+  // Hero Section
+  heroContainer: {
+    width: '100%',
   },
-  backButton: {
-    fontSize: 16,
-    color: COLORS.primary,
-    marginBottom: 16,
+  heroGradient: {
+    flex: 1,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 8,
+  heroContent: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.lg,
   },
-  subtitle: {
-    fontSize: 16,
-    color: COLORS.gray,
+  heroBackButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.md,
+  },
+  heroTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: COLORS.offWhite,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: COLORS.offWhite,
+    opacity: 0.9,
+  },
+  // Content
+  content: {
+    marginTop: -SPACING.md,
+    paddingTop: SPACING.lg,
   },
   orderCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.xxl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+    ...SHADOWS.sm,
   },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
-    paddingBottom: 12,
+    marginBottom: SPACING.md,
+    paddingBottom: SPACING.md,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    borderBottomColor: COLORS.borderCream,
   },
   orderNumber: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.xs,
   },
   orderDate: {
-    fontSize: 14,
-    color: COLORS.gray,
+    fontSize: 13,
+    color: COLORS.sage,
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   orderItems: {
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   orderItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   itemName: {
     fontSize: 14,
-    color: '#374151',
+    color: COLORS.gray,
     flex: 1,
   },
   itemPrice: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.primary,
+    color: COLORS.leaf,
   },
   orderFooter: {
-    paddingTop: 12,
+    paddingTop: SPACING.md,
     borderTopWidth: 1,
-    borderTopColor: COLORS.lightGray,
+    borderTopColor: COLORS.borderCream,
   },
   orderInfo: {
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   orderInfoLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 2,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    color: COLORS.sage,
+    marginBottom: SPACING.xs,
+    textTransform: 'uppercase',
   },
   orderInfoValue: {
     fontSize: 14,
-    color: '#374151',
+    color: COLORS.darkGreen,
   },
   orderTotal: {
     flexDirection: 'row',
@@ -367,63 +629,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   orderTotalLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   orderTotalValue: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontWeight: '700',
+    color: COLORS.leaf,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  // Reorder Button
+  reorderButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: COLORS.gray,
-  },
-  emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
+    gap: SPACING.sm,
+    backgroundColor: COLORS.darkGreen,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    marginTop: SPACING.lg,
+    ...SHADOWS.sm,
+  },
+  reorderButtonLoading: {
+    backgroundColor: COLORS.sage,
+  },
+  reorderButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.offWhite,
+    letterSpacing: 0.5,
+  },
+  // Reorder Result
+  reorderResult: {
+    backgroundColor: COLORS.offWhite,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    marginTop: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.leaf,
+  },
+  reorderResultWarning: {
+    borderColor: COLORS.warning,
+  },
+  reorderResultRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    padding: 40,
+    gap: SPACING.sm,
   },
-  emptyIcon: {
-    fontSize: 80,
-    marginBottom: 24,
+  reorderResultText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
+  reorderUnavailableText: {
+    fontSize: 12,
     color: COLORS.gray,
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 24,
+    marginTop: SPACING.xs,
   },
-  actionButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  actionButtonText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: 'bold',
+  // Bottom Spacer
+  bottomSpacer: {
+    height: SPACING.xxl,
   },
 });

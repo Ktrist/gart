@@ -18,7 +18,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { MapPin, Truck, Package, Snowflake, AlertCircle, ChevronLeft } from 'lucide-react-native';
 import { useShopStore } from '../store/shopStore';
 import {
   DeliveryAddress,
@@ -26,20 +28,16 @@ import {
   isValidFrenchPostalCode,
   calculateShippingRate,
 } from '../services/deliveryService';
+import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../constants/theme';
 
-const COLORS = {
-  primary: '#2E7D32',
-  primaryDark: '#1B5E20',
-  beige: '#F5F5DC',
-  beigeDark: '#E8E8CD',
-  white: '#FFFFFF',
-  red: '#DC2626',
-  gray: '#6B7280',
-  green: '#10B981',
-};
+const ICON_SIZE = 20;
+const STROKE_WIDTH = 1.5;
 
 export default function DeliveryAddressScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const topPadding = insets.top + 20;
+
   const {
     deliveryAddress,
     setDeliveryAddress,
@@ -149,14 +147,49 @@ export default function DeliveryAddressScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollView}>
-        <Text style={styles.title}>📍 Adresse de livraison</Text>
+        {/* Header with back button */}
+        <View style={[styles.header, { paddingTop: topPadding }]}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <ChevronLeft
+              size={20}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.leaf}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.backButtonText}>Retour</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.titleRow}>
+          <MapPin
+            size={28}
+            strokeWidth={STROKE_WIDTH}
+            color={COLORS.darkGreen}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <Text style={styles.title}>Adresse de livraison</Text>
+        </View>
         <Text style={styles.subtitle}>
           Livraison en chaîne du froid avec Chronofresh
         </Text>
 
         {/* Shipping Info Card */}
         <View style={styles.shippingInfoCard}>
-          <Text style={styles.shippingInfoTitle}>🚚 Informations livraison</Text>
+          <View style={styles.sectionTitleRow}>
+            <Truck
+              size={ICON_SIZE}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.leaf}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.shippingInfoTitle}>Informations livraison</Text>
+          </View>
           <View style={styles.shippingInfoRow}>
             <Text style={styles.shippingInfoLabel}>Poids total</Text>
             <Text style={styles.shippingInfoValue}>
@@ -254,7 +287,16 @@ export default function DeliveryAddressScreen() {
         {/* Shipping Rate Display */}
         {postalCode.length === 5 && (
           <View style={styles.shippingRateCard}>
-            <Text style={styles.shippingRateTitle}>📦 Frais de port</Text>
+            <View style={styles.sectionTitleRow}>
+              <Package
+                size={ICON_SIZE}
+                strokeWidth={STROKE_WIDTH}
+                color={COLORS.leaf}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              <Text style={styles.shippingRateTitle}>Frais de port</Text>
+            </View>
 
             {isCalculating ? (
               <View style={styles.loadingContainer}>
@@ -263,7 +305,16 @@ export default function DeliveryAddressScreen() {
               </View>
             ) : localShippingError ? (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>❌ {localShippingError}</Text>
+                <View style={styles.errorContent}>
+                  <AlertCircle
+                    size={18}
+                    strokeWidth={STROKE_WIDTH}
+                    color={COLORS.error}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                  <Text style={styles.errorText}>{localShippingError}</Text>
+                </View>
               </View>
             ) : localShippingRate ? (
               <>
@@ -300,7 +351,16 @@ export default function DeliveryAddressScreen() {
 
         {/* Cold Chain Info */}
         <View style={styles.coldChainCard}>
-          <Text style={styles.coldChainTitle}>❄️ Livraison en chaîne du froid</Text>
+          <View style={styles.coldChainTitleRow}>
+            <Snowflake
+              size={ICON_SIZE}
+              strokeWidth={STROKE_WIDTH}
+              color={COLORS.darkGreen}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+            <Text style={styles.coldChainTitle}>Livraison en chaîne du froid</Text>
+          </View>
           <Text style={styles.coldChainText}>
             Vos produits frais sont livrés dans un emballage isotherme avec packs
             de gel réfrigérant pour garantir leur fraîcheur jusqu'à votre porte.
@@ -337,79 +397,113 @@ export default function DeliveryAddressScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.beige,
+    backgroundColor: COLORS.offWhite,
   },
   scrollView: {
     flex: 1,
-    padding: 16,
+    padding: SPACING.lg,
+  },
+  header: {
+    marginBottom: SPACING.md,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: COLORS.leaf,
+    fontWeight: '600',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 8,
-    marginTop: 40,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   subtitle: {
     fontSize: 16,
-    color: COLORS.gray,
-    marginBottom: 24,
+    color: COLORS.sage,
+    marginBottom: SPACING.lg,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   shippingInfoCard: {
-    backgroundColor: '#E8F5E9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.leaf,
   },
   shippingInfoTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 12,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.leaf,
+    marginBottom: SPACING.md,
+    textTransform: 'uppercase',
   },
   shippingInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   shippingInfoLabel: {
     fontSize: 14,
-    color: COLORS.primaryDark,
+    color: COLORS.darkGreen,
   },
   shippingInfoValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: COLORS.primaryDark,
+    color: COLORS.leaf,
   },
   formSection: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+    ...SHADOWS.sm,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 16,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.sage,
+    marginBottom: SPACING.md,
+    textTransform: 'uppercase',
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
+    marginBottom: SPACING.sm,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   input: {
-    backgroundColor: COLORS.beige,
+    backgroundColor: COLORS.offWhite,
     borderWidth: 1,
-    borderColor: COLORS.beigeDark,
-    borderRadius: 8,
-    padding: 12,
+    borderColor: COLORS.borderCream,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
     fontSize: 16,
-    color: '#374151',
+    color: COLORS.darkGreen,
   },
   textArea: {
     height: 80,
@@ -417,12 +511,12 @@ const styles = StyleSheet.create({
   },
   inputHint: {
     fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 4,
+    color: COLORS.sage,
+    marginTop: SPACING.xs,
   },
   rowInputs: {
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
   },
   postalCodeInput: {
     flex: 1,
@@ -432,41 +526,49 @@ const styles = StyleSheet.create({
   },
   shippingRateCard: {
     backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.leaf,
+    ...SHADOWS.sm,
   },
   shippingRateTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-    marginBottom: 16,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 2,
+    color: COLORS.leaf,
+    marginBottom: SPACING.md,
+    textTransform: 'uppercase',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
+    padding: SPACING.md,
   },
   loadingText: {
-    marginLeft: 8,
-    color: COLORS.gray,
+    marginLeft: SPACING.sm,
+    color: COLORS.sage,
   },
   errorContainer: {
-    backgroundColor: '#FEE2E2',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: COLORS.errorLight,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+  },
+  errorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
   },
   errorText: {
-    color: COLORS.red,
-    textAlign: 'center',
+    color: COLORS.error,
   },
   shippingRateRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: SPACING.md,
   },
   shippingRateLabel: {
     fontSize: 14,
@@ -475,49 +577,56 @@ const styles = StyleSheet.create({
   shippingRateValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.darkGreen,
   },
   shippingRateTotal: {
     borderTopWidth: 1,
-    borderTopColor: COLORS.beigeDark,
-    paddingTop: 12,
-    marginTop: 4,
+    borderTopColor: COLORS.borderCream,
+    paddingTop: SPACING.md,
+    marginTop: SPACING.xs,
   },
   shippingRateTotalLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   shippingRateTotalValue: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.primary,
+    fontWeight: '700',
+    color: COLORS.leaf,
   },
   grandTotal: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.green,
+    fontWeight: '700',
+    color: COLORS.leaf,
   },
   enterPostalCodeText: {
     textAlign: 'center',
-    color: COLORS.gray,
+    color: COLORS.sage,
     fontStyle: 'italic',
   },
   coldChainCard: {
-    backgroundColor: '#EBF8FF',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: COLORS.offWhite,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.md,
     marginBottom: 100,
+    borderWidth: 1,
+    borderColor: COLORS.borderCream,
+  },
+  coldChainTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   coldChainTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1E40AF',
-    marginBottom: 8,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.darkGreen,
   },
   coldChainText: {
     fontSize: 14,
-    color: '#1E40AF',
+    color: COLORS.gray,
     lineHeight: 20,
   },
   footer: {
@@ -526,40 +635,43 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: COLORS.white,
-    borderTopWidth: 2,
-    borderTopColor: COLORS.primary,
-    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderCream,
+    padding: SPACING.md,
     flexDirection: 'row',
-    gap: 12,
+    gap: SPACING.md,
+    ...SHADOWS.lg,
   },
   cancelButton: {
     flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: COLORS.beige,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    backgroundColor: COLORS.offWhite,
     borderWidth: 1,
-    borderColor: COLORS.beigeDark,
+    borderColor: COLORS.borderCream,
   },
   cancelButtonText: {
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: COLORS.gray,
+    color: COLORS.sage,
   },
   submitButton: {
     flex: 2,
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    backgroundColor: COLORS.darkGreen,
+    ...SHADOWS.sm,
   },
   submitButtonDisabled: {
-    backgroundColor: COLORS.gray,
+    backgroundColor: COLORS.sage,
     opacity: 0.6,
   },
   submitButtonText: {
     textAlign: 'center',
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.offWhite,
+    letterSpacing: 0.5,
   },
 });
