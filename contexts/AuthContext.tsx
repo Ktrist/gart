@@ -8,6 +8,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
+import { useFavoritesStore } from '../store/favoritesStore';
 import { Alert, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
@@ -55,6 +56,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         loadProfile(session.user.id);
+        // Load favorites on initial session
+        useFavoritesStore.getState().fetchFavorites();
       } else {
         setLoading(false);
       }
@@ -68,9 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         loadProfile(session.user.id);
+        // Load favorites when user logs in
+        useFavoritesStore.getState().fetchFavorites();
       } else {
         setProfile(null);
         setLoading(false);
+        // Clear favorites when user logs out
+        useFavoritesStore.getState().clearFavorites();
       }
     });
 
@@ -291,6 +298,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     try {
       setLoading(true);
+      // Clear favorites before signing out
+      useFavoritesStore.getState().clearFavorites();
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
     } catch (error: any) {
