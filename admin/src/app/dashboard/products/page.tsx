@@ -187,36 +187,20 @@ export default function ProductsPage() {
     const supabase = createClient();
     const name = deletingProduct.name;
 
-    // If product has orders, go straight to soft-delete
-    if (deletingProduct.order_count > 0) {
-      const { error } = await supabase
-        .from("products")
-        .update({ is_available: false, stock: 0 })
-        .eq("id", deletingProduct.id);
+    // Always try soft-delete (hide from shop) — safe regardless of FK constraints
+    const { error } = await supabase
+      .from("products")
+      .update({ is_available: false, stock: 0 })
+      .eq("id", deletingProduct.id);
 
-      if (!error) {
-        setProducts((prev) =>
-          prev.map((p) => (p.id === deletingProduct.id ? { ...p, is_available: false, stock: 0 } : p))
-        );
-        setDeletingProduct(null);
-        toast.success(`${name} masqu\u00e9 de la boutique`);
-      } else {
-        toast.error("Erreur lors de la d\u00e9sactivation du produit");
-      }
+    if (!error) {
+      setProducts((prev) =>
+        prev.map((p) => (p.id === deletingProduct.id ? { ...p, is_available: false, stock: 0 } : p))
+      );
+      setDeletingProduct(null);
+      toast.success(`${name} masqu\u00e9 de la boutique`);
     } else {
-      // No orders, safe to hard delete
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .eq("id", deletingProduct.id);
-
-      if (!error) {
-        setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
-        setDeletingProduct(null);
-        toast.success(`${name} supprim\u00e9`);
-      } else {
-        toast.error("Erreur lors de la suppression");
-      }
+      toast.error("Erreur lors de la suppression");
     }
 
     setDeleting(false);
@@ -532,13 +516,9 @@ export default function ProductsPage() {
           {deletingProduct && (
             <>
               <DialogHeader>
-                <DialogTitle>Supprimer le produit</DialogTitle>
+                <DialogTitle>Masquer le produit</DialogTitle>
                 <DialogDescription>
-                  {deletingProduct.order_count > 0 ? (
-                    <>Ce produit appara&icirc;t dans {deletingProduct.order_count} commande{deletingProduct.order_count > 1 ? "s" : ""}. Il sera masqu&eacute; de la boutique au lieu d&apos;&ecirc;tre supprim&eacute;.</>
-                  ) : (
-                    <>&Ecirc;tes-vous s&ucirc;r de vouloir supprimer &laquo;&nbsp;{deletingProduct.name}&nbsp;&raquo; ? Cette action est irr&eacute;versible.</>
-                  )}
+                  &laquo;&nbsp;{deletingProduct.name}&nbsp;&raquo; sera masqu&eacute; de la boutique et son stock remis &agrave; z&eacute;ro. Vous pourrez le rendre visible &agrave; nouveau en cliquant sur son badge de statut.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex gap-3 justify-end">
@@ -551,7 +531,7 @@ export default function ProductsPage() {
                   disabled={deleting}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  {deleting ? "Suppression..." : "Supprimer"}
+                  {deleting ? "Masquage..." : "Masquer"}
                 </Button>
               </div>
             </>
