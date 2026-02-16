@@ -176,18 +176,36 @@ export default function ProductsPage() {
     setDeleting(true);
 
     const supabase = createClient();
+    const name = deletingProduct.name;
+
+    // Try hard delete first
     const { error } = await supabase
       .from("products")
       .delete()
       .eq("id", deletingProduct.id);
 
     if (!error) {
-      const name = deletingProduct.name;
       setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
       setDeletingProduct(null);
       toast.success(`${name} supprim\u00e9`);
+    } else if (error.code === "23503") {
+      // FK constraint: product is linked to orders, soft-delete instead
+      const { error: updateError } = await supabase
+        .from("products")
+        .update({ is_available: false, stock: 0 })
+        .eq("id", deletingProduct.id);
+
+      if (!updateError) {
+        setProducts((prev) =>
+          prev.map((p) => (p.id === deletingProduct.id ? { ...p, is_available: false, stock: 0 } : p))
+        );
+        setDeletingProduct(null);
+        toast.success(`${name} masqu\u00e9 (li\u00e9 \u00e0 des commandes, suppression impossible)`);
+      } else {
+        toast.error("Erreur lors de la d\u00e9sactivation du produit");
+      }
     } else {
-      toast.error("Erreur lors de la suppression. Le produit est peut-\u00eatre li\u00e9 \u00e0 des commandes.");
+      toast.error("Erreur lors de la suppression");
     }
 
     setDeleting(false);
@@ -497,7 +515,7 @@ export default function ProductsPage() {
               <DialogHeader>
                 <DialogTitle>Supprimer le produit</DialogTitle>
                 <DialogDescription>
-                  &Ecirc;tes-vous s&ucirc;r de vouloir supprimer &laquo;&nbsp;{deletingProduct.name}&nbsp;&raquo; ? Cette action est irr&eacute;versible.
+                  &Ecirc;tes-vous s&ucirc;r de vouloir supprimer &laquo;&nbsp;{deletingProduct.name}&nbsp;&raquo; ? Si le produit est li&eacute; &agrave; des commandes, il sera masqu&eacute; au lieu d&apos;&ecirc;tre supprim&eacute;.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex gap-3 justify-end">
