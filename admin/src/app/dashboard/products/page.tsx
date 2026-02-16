@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Package, Search, Save, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { Package, Search, Save, AlertTriangle, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { toast } from "sonner";
 import type { Product } from "@/lib/types";
 
@@ -19,12 +19,16 @@ interface Category {
   slug: string;
 }
 
+interface ProductWithOrders extends Product {
+  order_count: number;
+}
+
 export default function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<ProductWithOrders[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductWithOrders | null>(null);
   const [editStock, setEditStock] = useState("");
   const [editPrice, setEditPrice] = useState("");
   const [editAvailable, setEditAvailable] = useState(true);
@@ -42,7 +46,7 @@ export default function ProductsPage() {
   const [creating, setCreating] = useState(false);
 
   // Delete state
-  const [deletingProduct, setDeletingProduct] = useState<Product | null>(null);
+  const [deletingProduct, setDeletingProduct] = useState<ProductWithOrders | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -63,16 +67,21 @@ export default function ProductsPage() {
     const supabase = createClient();
     const { data, error } = await supabase
       .from("products")
-      .select("id, name, description, price, unit, image_url, stock, is_available, weight_grams, created_at, categories(name)")
+      .select("id, name, description, price, unit, image_url, stock, is_available, weight_grams, created_at, categories(name), order_items(count)")
       .order("name", { ascending: true });
 
     if (!error && data) {
-      setProducts(data as unknown as Product[]);
+      const productsWithCount = data.map((p: any) => ({
+        ...p,
+        order_count: p.order_items?.[0]?.count ?? 0,
+        order_items: undefined,
+      }));
+      setProducts(productsWithCount as ProductWithOrders[]);
     }
     setLoading(false);
   }
 
-  function openEdit(product: Product) {
+  function openEdit(product: ProductWithOrders) {
     setEditingProduct(product);
     setEditStock(product.stock.toString());
     setEditPrice(product.price.toString());
@@ -110,7 +119,7 @@ export default function ProductsPage() {
     setSaving(false);
   }
 
-  async function toggleAvailability(product: Product) {
+  async function toggleAvailability(product: ProductWithOrders) {
     const supabase = createClient();
     const newAvailable = !product.is_available;
 
@@ -150,7 +159,7 @@ export default function ProductsPage() {
       .single();
 
     if (!error && data) {
-      setProducts((prev) => [...prev, data as unknown as Product].sort((a, b) => a.name.localeCompare(b.name)));
+      setProducts((prev) => [...prev, { ...(data as unknown as Product), order_count: 0 }].sort((a, b) => a.name.localeCompare(b.name)));
       resetCreateForm();
       toast.success(`${newName.trim()} cr\u00e9\u00e9 avec succ\u00e8s`);
     } else {
@@ -311,7 +320,15 @@ export default function ProductsPage() {
                         )}
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{product.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{product.name}</p>
+                          {product.order_count > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
+                              <ShoppingBag className="h-3 w-3" />
+                              {product.order_count}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground truncate max-w-[200px]">{product.description}</p>
                       </div>
                     </div>
@@ -515,7 +532,11 @@ export default function ProductsPage() {
               <DialogHeader>
                 <DialogTitle>Supprimer le produit</DialogTitle>
                 <DialogDescription>
-                  &Ecirc;tes-vous s&ucirc;r de vouloir supprimer &laquo;&nbsp;{deletingProduct.name}&nbsp;&raquo; ? Si le produit est li&eacute; &agrave; des commandes, il sera masqu&eacute; au lieu d&apos;&ecirc;tre supprim&eacute;.
+                  {deletingProduct.order_count > 0 ? (
+                    <>Ce produit appara&icirc;t dans {deletingProduct.order_count} commande{deletingProduct.order_count > 1 ? "s" : ""}. Il sera masqu&eacute; de la boutique au lieu d&apos;&ecirc;tre supprim&eacute;.</>
+                  ) : (
+                    <>&Ecirc;tes-vous s&ucirc;r de vouloir supprimer &laquo;&nbsp;{deletingProduct.name}&nbsp;&raquo; ? Cette action est irr&eacute;versible.</>
+                  )}
                 </DialogDescription>
               </DialogHeader>
               <div className="flex gap-3 justify-end">
