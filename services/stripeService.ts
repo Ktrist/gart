@@ -78,12 +78,39 @@ export const stripeService = {
   },
 
   /**
-   * Vérifie le statut d'un paiement (pour future utilisation avec webhooks)
+   * Vérifie le statut d'un paiement via la Edge Function
    */
   async checkPaymentStatus(paymentIntentId: string): Promise<boolean> {
-    // TODO: Implémenter avec Stripe API ou webhook
-    // Pour l'instant, on fait confiance au résultat du Payment Sheet
-    return true;
+    if (!STRIPE_FUNCTION_URL) return true;
+
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+      // Derive the verify URL from the create-payment-intent URL
+      const baseUrl = STRIPE_FUNCTION_URL.replace(/\/create-payment-intent\/?$/, '');
+      const verifyUrl = `${baseUrl}/verify-payment`;
+
+      const response = await fetch(verifyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || anonKey}`,
+        },
+        body: JSON.stringify({ paymentIntentId }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json();
+      return data.status === 'succeeded';
+    } catch (error) {
+      console.error('Error verifying payment:', error);
+      // If verification fails, trust the Payment Sheet result as fallback
+      return true;
+    }
   },
 };
 

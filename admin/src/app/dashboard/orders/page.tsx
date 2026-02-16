@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Package, ChevronDown, ChevronUp, Truck, MapPin, Bell } from "lucide-react";
+import { toast } from "sonner";
 import type { Order } from "@/lib/types";
 
 const STATUS_OPTIONS = [
@@ -110,6 +111,11 @@ export default function OrdersPage() {
       if (selectedOrder?.id === orderId) {
         setSelectedOrder((prev) => prev ? { ...prev, status: newStatus as Order["status"] } : null);
       }
+
+      const statusLabel = STATUS_BADGE[newStatus as keyof typeof STATUS_BADGE]?.label || newStatus;
+      toast.success(`Commande pass\u00e9e en "${statusLabel}"`);
+    } else {
+      toast.error("Erreur lors de la mise \u00e0 jour du statut");
     }
 
     setUpdating(null);

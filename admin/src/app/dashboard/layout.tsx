@@ -8,6 +8,7 @@ import {
   ShoppingBag,
   Package,
   BarChart3,
+  CalendarDays,
   LogOut,
   Menu,
   X,
@@ -38,6 +39,11 @@ const navigation = [
     label: "Produits",
     href: "/dashboard/products",
     icon: Package,
+  },
+  {
+    label: "Cycles de vente",
+    href: "/dashboard/cycles",
+    icon: CalendarDays,
   },
   {
     label: "Analytics",

@@ -343,7 +343,8 @@ export const supabaseApiService = {
 
     if (itemsError) {
       console.error('Error creating order items:', itemsError);
-      // TODO: Rollback la commande si échec
+      // Rollback: delete the order since items failed to insert
+      await supabase.from('orders').delete().eq('id', order.id);
       return null;
     }
 

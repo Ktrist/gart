@@ -408,7 +408,12 @@ export default function OrdersHistoryScreen() {
         <View style={[styles.content, { width: contentWidth, alignSelf: 'center' }]}>
           {/* Orders List */}
           {orders.map((order) => (
-          <View key={order.id} style={styles.orderCard}>
+          <TouchableOpacity
+            key={order.id}
+            style={styles.orderCard}
+            activeOpacity={0.7}
+            onPress={() => router.push({ pathname: '/order-detail', params: { orderId: order.id } })}
+          >
             {/* Order Header */}
             <View style={styles.orderHeader}>
               <View>
@@ -528,7 +533,7 @@ export default function OrdersHistoryScreen() {
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
 
           {/* Bottom Spacer */}

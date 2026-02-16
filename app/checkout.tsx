@@ -50,6 +50,7 @@ export default function CheckoutScreen() {
 
   const [loading, setLoading] = useState(false);
   const [paymentReady, setPaymentReady] = useState(false);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
 
   const subtotal = getCartTotal();
   const total = getTotalWithShipping();
@@ -90,7 +91,7 @@ export default function CheckoutScreen() {
       }
 
       // Créer le Payment Intent via notre Edge Function
-      const { clientSecret, paymentIntentId } =
+      const { clientSecret, paymentIntentId: piId } =
         await stripeService.createPaymentIntent({
           amount: total,
           description: `Commande Gart - ${cart.length} article(s)${deliveryType === 'chronofresh' ? ' (Livraison Chronofresh)' : ''}`,
@@ -123,6 +124,7 @@ export default function CheckoutScreen() {
         return;
       }
 
+      setPaymentIntentId(piId);
       setPaymentReady(true);
     } catch (error) {
       console.error('Error creating payment intent:', error);
@@ -188,6 +190,19 @@ export default function CheckoutScreen() {
       // Vérifier que l'utilisateur est connecté
       if (!user) {
         throw new Error('User not authenticated');
+      }
+
+      // Vérifier le paiement côté serveur
+      if (paymentIntentId) {
+        const paymentVerified = await stripeService.checkPaymentStatus(paymentIntentId);
+        if (!paymentVerified) {
+          Alert.alert(
+            'Erreur de paiement',
+            'Le paiement n\'a pas pu être vérifié. Contactez le support.'
+          );
+          setLoading(false);
+          return;
+        }
       }
 
       // Récupérer le cycle de vente actuel
