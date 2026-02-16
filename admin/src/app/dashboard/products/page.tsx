@@ -187,34 +187,36 @@ export default function ProductsPage() {
     const supabase = createClient();
     const name = deletingProduct.name;
 
-    // Try hard delete first
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", deletingProduct.id);
-
-    if (!error) {
-      setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
-      setDeletingProduct(null);
-      toast.success(`${name} supprim\u00e9`);
-    } else if (error.code === "23503") {
-      // FK constraint: product is linked to orders, soft-delete instead
-      const { error: updateError } = await supabase
+    // If product has orders, go straight to soft-delete
+    if (deletingProduct.order_count > 0) {
+      const { error } = await supabase
         .from("products")
         .update({ is_available: false, stock: 0 })
         .eq("id", deletingProduct.id);
 
-      if (!updateError) {
+      if (!error) {
         setProducts((prev) =>
           prev.map((p) => (p.id === deletingProduct.id ? { ...p, is_available: false, stock: 0 } : p))
         );
         setDeletingProduct(null);
-        toast.success(`${name} masqu\u00e9 (li\u00e9 \u00e0 des commandes, suppression impossible)`);
+        toast.success(`${name} masqu\u00e9 de la boutique`);
       } else {
         toast.error("Erreur lors de la d\u00e9sactivation du produit");
       }
     } else {
-      toast.error("Erreur lors de la suppression");
+      // No orders, safe to hard delete
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", deletingProduct.id);
+
+      if (!error) {
+        setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
+        setDeletingProduct(null);
+        toast.success(`${name} supprim\u00e9`);
+      } else {
+        toast.error("Erreur lors de la suppression");
+      }
     }
 
     setDeleting(false);
